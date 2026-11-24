@@ -1,0 +1,1015 @@
+<div class="min-h-screen">
+	@if (!game.state()) {
+		<main class="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-4 py-10">
+			<div class="background-text mx-auto mb-8 max-w-3xl text-center">
+				<div class="ornament mb-3 text-sm">✦ &nbsp; CHRONICA REGNI &nbsp; ✦</div>
+				<div class="mb-3 text-5xl text-[#c9ab70]">♛</div>
+				<h1 class="engraved text-4xl font-semibold tracking-wide text-[#ead9b6] sm:text-5xl">Kroniki Imperium</h1>
+				<p class="mt-3 text-base uppercase tracking-[.28em] text-[#b69a68]">Fantasyczny symulator imperium</p>
+				<div class="mx-auto mt-6 h-px max-w-sm bg-gradient-to-r from-transparent via-[#a88a55] to-transparent"></div>
+				<p class="mx-auto mt-6 max-w-xl leading-7 text-[#bcb09a]">
+					Twoje decyzje zapiszą się w historii. Dwór będzie pamiętał przysługi, zniewagi i zdrady, a skutki rozkazów mogą nadejść po wielu latach.
+				</p>
+			</div>
+
+			<div class="mx-auto grid w-full max-w-4xl gap-5 lg:grid-cols-2">
+				<section class="panel-dark rounded-lg p-6">
+					<div class="mb-5 flex items-center gap-3 border-b gold-rule pb-4">
+						<span class="text-2xl text-[#c7a76a]">⚜</span>
+						<div>
+							<h2 class="text-xl text-[#ead9b6]">Załóż nowe imperium</h2>
+							<p class="mt-1 text-sm text-[#aa9c83]">Świat i początek rodu władców stworzy AI</p>
+						</div>
+					</div>
+					<label class="mb-2 block text-base text-[#d6c5a4]" for="kingdom-name">Nazwa imperium</label>
+					<input
+						id="kingdom-name"
+						class="field mb-4"
+						[ngModel]="setupKingdomName()"
+						(ngModelChange)="setupKingdomName.set($event)"
+						[attr.maxlength]="gameConfig.content.kingdomNameMaxLength" />
+					@if (newGameError()) {
+						<p class="mb-4 rounded border border-red-900/50 bg-red-950/30 p-3 text-base text-red-200">{{ newGameError() }}</p>
+					}
+					<button class="medieval-button w-full rounded px-4 py-3 text-base font-semibold tracking-wide" [disabled]="isStartingGame()" (click)="startNewGame()">
+						@if (isStartingGame()) {
+							Tworzenie świata przez AI…
+						} @else {
+							Rozpocznij panowanie
+						}
+					</button>
+					<p class="mt-3 text-center text-sm leading-5 text-[#988b75]">AI przygotuje władcę, orszak, historię, statystyki i pierwsze wydarzenie.</p>
+				</section>
+
+				<section class="panel-dark rounded-lg p-6">
+					<div class="mb-5 flex items-center gap-3 border-b gold-rule pb-4">
+						<span class="text-2xl text-[#c7a76a]">✦</span>
+						<div>
+							<h2 class="text-xl text-[#ead9b6]">Przygotuj orszak</h2>
+							<p class="mt-1 text-sm text-[#aa9c83]">Połączenie z wybranym dostawcą AI</p>
+						</div>
+					</div>
+					<p class="mb-5 text-base leading-6 text-[#bcb09a]">
+						Gra korzysta z Twojego klucza API do tworzenia postaci, wydarzeń i konsekwencji. Nie wymaga własnego serwera ani konta w grze.
+					</p>
+					<div class="mb-4 rounded border border-[#a58a58]/35 bg-black/20 p-3 text-base text-[#c9b894]">
+						<div class="mb-1 flex items-center justify-between">
+							<span>Dostawca AI</span><span class="text-[#e4c27f]">{{ aiConfiguration.configuration().provider }}</span>
+						</div>
+						<div class="flex items-center justify-between">
+							<span>Model</span><span class="max-w-[60%] truncate text-right text-[#e4c27f]">{{ aiConfiguration.configuration().model }}</span>
+						</div>
+						<div class="mt-2 text-sm text-[#96896f]">
+							{{ aiConfiguration.configuration().apiKey ? "Klucz API został wprowadzony." : "Nie skonfigurowano jeszcze klucza API." }}
+						</div>
+					</div>
+					<button class="subtle-button w-full rounded px-4 py-3 text-base" (click)="openSettings()">Konfiguracja AI</button>
+					<div class="mt-6 border-t gold-rule pt-4">
+						<div class="mb-3 flex items-center justify-between">
+							<h3 class="text-base font-semibold text-[#d9c59e]">Zapisane imperia</h3>
+							<span class="text-sm text-[#94856b]">{{ game.saves().length }} zapisów</span>
+						</div>
+						@if (game.saves().length === 0) {
+							<p class="text-base text-[#91856f]">Brak zapisanych rozgrywek.</p>
+						} @else {
+							<div class="max-h-44 space-y-2 overflow-y-auto scroll-panel">
+								@for (save of game.saves(); track save.id) {
+									<div class="flex items-center justify-between gap-3 rounded border border-white/5 bg-black/20 px-3 py-2">
+										<div class="min-w-0">
+											<p class="truncate text-base text-[#e2d4b8]">{{ save.kingdomName }}</p>
+											<p class="text-sm text-[#94856b]">{{ save.currentRulerName }} · {{ formatShortDate(save.currentDate) }}</p>
+										</div>
+										<div class="flex shrink-0 gap-2">
+											<button class="subtle-button rounded px-3 py-1.5 text-sm" (click)="loadGame(save.id)">Wczytaj</button>
+											<button class="rounded border border-red-900/50 px-2 py-1.5 text-sm text-red-300" (click)="deleteGame(save.id)" aria-label="Usuń zapis">
+												×
+											</button>
+										</div>
+									</div>
+								}
+							</div>
+						}
+					</div>
+				</section>
+			</div>
+			<p class="background-text mx-auto mt-8 max-w-2xl text-center text-sm leading-5 text-[#7f7562]">
+				Gra zapisuje świat lokalnie w tej przeglądarce. Klucz API jest domyślnie przechowywany tylko w pamięci bieżącej sesji.
+			</p>
+		</main>
+	} @else {
+		<div class="mx-auto px-3 pb-6 pt-3 sm:px-5 lg:px-7">
+			<header class="game-header mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg px-4 py-3 sm:px-6">
+				<div class="flex min-w-0 items-center gap-3">
+					<imp-empire-emblem [empireId]="game.state()!.id" [empireName]="game.state()!.kingdomName" [empireColor]="game.state()!.empireColor" size="medium" />
+					<div class="min-w-0">
+						<h1 class="truncate text-xl font-semibold tracking-wide sm:text-2xl" [style.color]="game.state()!.empireColor">{{ game.state()!.kingdomName }}</h1>
+						<p class="text-[12px] uppercase tracking-[.22em] text-[#a38b5e]">Kroniki Imperium · Orszak władcy</p>
+					</div>
+				</div>
+				<div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-base">
+					<div class="flex gap-2">
+						<button class="subtle-button rounded px-3 py-2 text-sm" (click)="returnToMainMenu()">Menu główne</button>
+						<button class="subtle-button rounded px-3 py-2 text-sm" (click)="showSaveManager.set(true)">Zapisy</button>
+						<button class="subtle-button rounded px-3 py-2 text-sm" (click)="openSettings()">Ustawienia</button>
+					</div>
+				</div>
+			</header>
+
+			@if (game.state()!.lastError) {
+				<div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-red-900/60 bg-red-950/45 px-4 py-3 text-base text-red-100">
+					<div class="min-w-0 flex-1"><strong class="mr-2">Błąd:</strong>{{ game.state()!.lastError }}</div>
+					<div class="flex shrink-0 gap-2">
+						<button class="rounded border border-red-200/40 px-3 py-1.5 text-sm" (click)="retryLastOperation()">Ponów operację</button>
+						<button class="rounded border border-red-300/30 px-3 py-1.5 text-sm" (click)="game.dismissError()">Zamknij</button>
+					</div>
+				</div>
+			}
+
+			<div class="desktop-grid grid grid-cols-[minmax(230px,285px)_minmax(420px,1fr)_minmax(230px,285px)] gap-4">
+				<aside class="panel-dark h-fit rounded-lg p-4">
+					<div class="mb-4 flex items-center justify-between border-b gold-rule pb-3">
+						<div>
+							<h2 class="text-base font-semibold text-[#e5d5b5]">Stan imperium</h2>
+							<p class="mt-1 text-[12px] uppercase tracking-widest text-[#927d55]">Skarbiec i poddani</p>
+						</div>
+						<span class="text-xl text-[#c4a56b]">⚖</span>
+					</div>
+					<div class="space-y-4">
+						@for (key of getStatisticKeys(); track key) {
+							<div>
+								<div class="mb-1.5 flex items-end justify-between gap-2">
+									<span class="text-sm text-[#c9bda5]">{{ statisticLabels[key] }}</span>
+									<span class="shrink-0 text-sm font-semibold tabular-nums" [class]="getStatisticTone(game.state()!, key)">{{
+										getStatisticDisplay(game.state()!, key)
+									}}</span>
+								</div>
+								@if (key !== "population") {
+									<div class="stat-track"><div class="stat-fill" [style.width]="getStatisticWidth(game.state()!, key)"></div></div>
+								}
+							</div>
+						}
+					</div>
+					<div class="mt-6 border-t gold-rule pt-4">
+						<div class="mb-3 flex items-center justify-between">
+							<h2 class="text-base font-semibold text-[#e5d5b5]">Sąsiednie imperia</h2>
+						</div>
+						<div class="space-y-3">
+							@for (empire of game.state()!.neighboringEmpires; track empire.id) {
+								<div class="rounded border border-[#a58a58]/30 bg-black/20 p-3">
+									<div class="flex items-center gap-2">
+										<imp-empire-emblem [empireId]="empire.id" [empireName]="empire.name" [empireColor]="empire.color" size="small" />
+										<p class="break-words text-sm font-semibold" [style.color]="empire.color">{{ empire.name }}</p>
+									</div>
+									<div class="flex items-center gap-2 pt-2">
+										<p class="min-w-0 flex-1 text-[12px] text-[#aa9b80]">Relacja z imperium</p>
+										<span class="shrink-0 text-sm font-semibold tabular-nums" [class]="getNeighborRelationshipTone(empire.relationship)">
+											{{ empire.relationship }} / 100
+										</span>
+									</div>
+									<div class="stat-track mt-2">
+										<div class="stat-fill" [style.width]="empire.relationship + '%'"></div>
+									</div>
+								</div>
+							}
+						</div>
+					</div>
+				</aside>
+
+				<main class="min-w-0">
+					@if (selectedTab() === "audience") {
+						<section class="panel-dark min-h-[600px] rounded-lg p-4 sm:p-6">
+							@if (!isInitialWorldScreen()) {
+								<div class="mb-5 grid grid-cols-1 items-center gap-y-3 border-b gold-rule pb-4 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-x-6">
+									<div class="flex flex-col items-start gap-y-1 justify-self-start">
+										<div class="flex flex-col items-baseline gap-x-3">
+											<p class="whitespace-nowrap text-base font-semibold text-[#e2d3b4] sm:text-lg">Rok: {{ formatYear(game.state()!.currentDate) }}</p>
+											<p class="whitespace-nowrap text-base font-semibold text-[#e2d3b4] sm:text-lg">{{ formatDayMonth(game.state()!.currentDate) }}</p>
+										</div>
+									</div>
+									<div class="text-center">
+										<div class="ornament mb-1 text-[11px]">✦ &nbsp; SALA AUDIENCYJNA &nbsp; ✦</div>
+										<h2 class="text-xl font-semibold text-[#ead9b6]">Audiencja władcy</h2>
+									</div>
+									<div class="flex flex-col items-center justify-self-end gap-2">
+										@if (currentMoonPhase(); as moonPhase) {
+											<span class="flex items-center gap-1.5 text-sm text-[#aa9b80]" [title]="'Faza księżyca: ' + moonPhase.label">
+												<span class="text-2xl leading-none" role="img" [attr.aria-label]="'Faza księżyca: ' + moonPhase.label">{{ moonPhase.symbol }}</span>
+												<span>{{ moonPhase.label }}</span>
+											</span>
+										}
+										<span class="text-sm text-[#aa9b80]">{{ currentSeason() }}</span>
+									</div>
+								</div>
+							}
+
+							@if (game.state()!.operation !== "idle") {
+								<div class="flex min-h-[390px] flex-col items-center justify-center text-center">
+									<div class="mb-5 text-5xl text-[#c9ab70]">✥</div>
+									<h3 class="text-lg text-[#e5d4b2]">
+										{{ game.state()!.operation === "generating-event" ? "Wieści docierają do tronu" : "Rozważanie rozkazu władcy" }}
+									</h3>
+									<p class="mt-2 max-w-sm text-base leading-6 text-[#a99b82]">Kronikarze zapisują wydarzenia, a doradcy ważą możliwe następstwa.</p>
+									<div
+										class="mt-6 h-12 w-12 animate-spin rounded-full border-4 border-[#b69a62]/25 border-t-[#d6b875]"
+										role="status"
+										aria-label="Ładowanie"></div>
+								</div>
+							} @else if (game.state()!.currentEvent; as event) {
+								@if (textToSpeech.isEnabled()) {
+									<div class="mb-2 flex justify-end gap-1">
+										@if (textToSpeech.isPaused()) {
+											<button
+												type="button"
+												class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+												aria-label="Wznów czytanie"
+												title="Wznów"
+												(click)="textToSpeech.resume()">
+												<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+													<path d="m8 5 12 7-12 7V5Z" />
+												</svg>
+											</button>
+										} @else if (textToSpeech.isSpeaking()) {
+											<button
+												type="button"
+												class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+												aria-label="Wstrzymaj czytanie"
+												title="Pauza"
+												(click)="textToSpeech.pause()">
+												<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+													<path d="M8 5h3v14H8zM15 5h3v14h-3z" />
+												</svg>
+											</button>
+										}
+										@if (textToSpeech.isSpeaking()) {
+											<button
+												type="button"
+												class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+												aria-label="Zatrzymaj czytanie"
+												title="Zatrzymaj"
+												(click)="textToSpeech.stop()">
+												<svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+											</button>
+										} @else {
+											<button
+												type="button"
+												class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+												aria-label="Rozpocznij czytanie audiencji"
+												title="Rozpocznij czytanie"
+												(click)="startCurrentNarration()">
+												<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+													<path d="m8 5 12 7-12 7V5Z" />
+												</svg>
+											</button>
+										}
+									</div>
+								}
+								@if (currentSpeaker(); as speaker) {
+									<div class="flex justify-center">
+										<button
+											type="button"
+											class="mb-5 flex max-w-full items-center gap-4 rounded border border-[#a58a58]/35 bg-black/20 p-3 text-left transition hover:border-[#c5a86f]/70 hover:bg-[#7b6034]/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d6b875]"
+											[attr.aria-label]="'Pokaż szczegóły postaci ' + speaker.fullName"
+											(click)="showCharacter(speaker)">
+											<imp-character-portrait [character]="speaker" [empireColor]="getCharacterEmpire(speaker)?.color ?? null" size="medium" />
+											<div class="min-w-0">
+												<p class="text-[12px] uppercase tracking-widest text-[#9c8966]">Osoba przybyła na audiencję</p>
+												<p class="line-clamp-2 break-words text-base font-semibold text-[#e1d2b3]">{{ speaker.fullName }}</p>
+												<p class="truncate text-sm text-[#aa9b80]">{{ speaker.occupation }} · {{ factionLabels[speaker.faction] }}</p>
+												@if (getCharacterEmpire(speaker); as empire) {
+													<p class="truncate text-[12px]" [style.color]="empire.color">{{ empire.name }}</p>
+												}
+											</div>
+										</button>
+									</div>
+								}
+								<div class="mb-5 text-center">
+									<h3 class="mt-2 text-2xl font-semibold text-[#f0dfbd]">{{ event.title }}</h3>
+								</div>
+								<div class="parchment relative mb-5 rounded-md p-5 sm:p-7">
+									<div class="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 text-xl text-[#8c6c37]">✦</div>
+									<p class="whitespace-pre-line text-base leading-7">{{ event.situation }}</p>
+								</div>
+								<div class="mb-3 flex items-center justify-between">
+									<h4 class="text-base font-semibold text-[#ddcba7]">Jak odpowiesz?</h4>
+								</div>
+								<div class="space-y-3">
+									@for (choice of event.choices; track choice.id; let index = $index) {
+										<button
+											class="group w-full rounded border border-[#a68b59]/35 bg-[#171612]/75 p-4 text-left transition hover:border-[#c5a86f]/75 hover:bg-[#7b6034]/15"
+											(click)="chooseOption(choice.id)">
+											<div class="flex items-start gap-3">
+												<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#a88a57]/40 text-sm text-[#d2b779]">{{
+													index + 1
+												}}</span>
+												<span class="min-w-0 text-base leading-6 text-[#a99d87]">{{ choice.description }}</span>
+												<span class="ml-auto pt-1 text-[#8c754b] opacity-0 transition group-hover:opacity-100">›</span>
+											</div>
+										</button>
+									}
+								</div>
+								<p class="mt-5 text-center text-sm leading-5 text-[#847a67]">
+									Wybrana decyzja może zmienić statystyki, relacje, los postaci i przyszłe wydarzenia.
+								</p>
+							} @else if (game.state()!.lastResolution; as resolution) {
+								<div class="parchment rounded-md p-6 sm:p-8">
+									@if (textToSpeech.isEnabled()) {
+										<div class="-mr-2 -mt-2 mb-1 flex justify-end gap-1">
+											@if (textToSpeech.isPaused()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#80643a] transition hover:bg-black/5 hover:text-[#674c27] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c7045]"
+													aria-label="Wznów czytanie"
+													title="Wznów"
+													(click)="textToSpeech.resume()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="m8 5 12 7-12 7V5Z" />
+													</svg>
+												</button>
+											} @else if (textToSpeech.isSpeaking()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#80643a] transition hover:bg-black/5 hover:text-[#674c27] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c7045]"
+													aria-label="Wstrzymaj czytanie"
+													title="Pauza"
+													(click)="textToSpeech.pause()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="M8 5h3v14H8zM15 5h3v14h-3z" />
+													</svg>
+												</button>
+											}
+											@if (textToSpeech.isSpeaking()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#80643a] transition hover:bg-black/5 hover:text-[#674c27] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c7045]"
+													aria-label="Zatrzymaj czytanie"
+													title="Zatrzymaj"
+													(click)="textToSpeech.stop()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+														<rect x="6" y="6" width="12" height="12" rx="1" />
+													</svg>
+												</button>
+											} @else {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#80643a] transition hover:bg-black/5 hover:text-[#674c27] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c7045]"
+													aria-label="Rozpocznij czytanie rozstrzygnięcia"
+													title="Rozpocznij czytanie"
+													(click)="startCurrentNarration()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="m8 5 12 7-12 7V5Z" />
+													</svg>
+												</button>
+											}
+										</div>
+									}
+									<div class="mb-3 text-center text-3xl text-[#8b6a36]">⚜</div>
+									<p class="text-center text-sm uppercase tracking-[.2em] text-[#84683c]">Rozstrzygnięcie audiencji · {{ formatDate(resolution.appliedAt) }}</p>
+									<h3 class="mt-2 text-center text-2xl font-semibold">{{ resolution.title }}</h3>
+									<p class="mt-5 whitespace-pre-line text-base leading-7">{{ resolution.description }}</p>
+									@if (getResolutionStatisticChanges(resolution); as statisticChanges) {
+										<div class="mt-5 border-t border-[#8c7045]/40 pt-4">
+											@if (getChangedStatisticKeys(statisticChanges).length > 0 || (getResolutionNeighboringEmpireChanges(resolution)?.length ?? 0) > 0) {
+												<div class="flex flex-wrap gap-2">
+													@for (key of getChangedStatisticKeys(statisticChanges); track key) {
+														<span class="rounded border border-[#8c7045]/25 bg-black/5 px-3 py-2 text-sm">
+															{{ statisticLabels[key] }} {{ statisticChanges[key]! > 0 ? "+" : "" }}{{ statisticChanges[key] }}
+														</span>
+													}
+													@if (getResolutionNeighboringEmpireChanges(resolution); as neighboringEmpireChanges) {
+														@for (change of neighboringEmpireChanges; track $index) {
+															<span class="rounded border border-[#8c7045]/25 bg-black/5 px-3 py-2 text-sm">
+																{{ getNeighboringEmpireChangeLabel(change) }}
+															</span>
+														}
+													}
+												</div>
+											} @else {
+												<p class="text-sm">Ta decyzja nie zmieniła żadnych statystyk.</p>
+											}
+										</div>
+									} @else {
+										<p class="mt-5 text-sm text-red-900">Nie odnaleziono zapisu zmian statystyk w kronice.</p>
+									}
+									@if (getResolutionConsequences(resolution); as consequences) {
+										@if (consequences.length > 0) {
+											<div class="mt-5 space-y-3 border-t border-[#8c7045]/40 pt-4">
+												<h4 class="text-base font-semibold text-[#674c27]">W międzyczasie nadeszły wieści</h4>
+												@for (consequence of consequences; track consequence.id) {
+													<article class="rounded border border-[#8c7045]/30 bg-black/5 p-3">
+														<p class="text-sm text-[#84683c]">{{ formatDate(consequence.date) }}</p>
+														<h5 class="mt-1 font-semibold">{{ consequence.title }}</h5>
+														<p class="mt-1 text-base leading-6">{{ consequence.consequenceDescription }}</p>
+														@if (getChangedStatisticKeys(consequence.statisticChanges).length > 0 || (consequence.neighboringEmpireChanges?.length ?? 0) > 0) {
+															<div class="mt-2 flex flex-wrap gap-2">
+																@for (change of getChangedStatisticKeys(consequence.statisticChanges); track change) {
+																	<span class="rounded bg-black/10 px-2 py-1 text-sm"
+																		>{{ statisticLabels[change] }} {{ consequence.statisticChanges[change]! > 0 ? "+" : ""
+																		}}{{ consequence.statisticChanges[change] }}</span
+																	>
+																}
+																@for (change of consequence.neighboringEmpireChanges ?? []; track $index) {
+																	<span class="rounded bg-black/10 px-2 py-1 text-sm">{{ getNeighboringEmpireChangeLabel(change) }}</span>
+																}
+															</div>
+														}
+														@if (consequence.involvedCharacterIds.length > 0) {
+															<div class="mt-2 flex flex-wrap gap-2">
+																@for (characterId of consequence.involvedCharacterIds; track characterId) {
+																	@if (game.getCharacter(characterId); as character) {
+																		<button
+																			class="text-sm text-[#765b30] underline decoration-[#856b40]/50 underline-offset-2"
+																			(click)="showCharacter(character)">
+																			{{ character.fullName }}
+																		</button>
+																	}
+																}
+															</div>
+														}
+													</article>
+												}
+											</div>
+										}
+									}
+									<div class="mt-6 text-center">
+										@if (game.isPrefetchingNextEvent()) {
+											<p class="mb-3 text-sm text-[#84683c]" role="status">Kronikarze przygotowują kolejną audiencję…</p>
+										}
+										<button class="medieval-button rounded px-7 py-3 text-base font-semibold" (click)="continueStory()">Przyjmij kolejne wieści</button>
+									</div>
+								</div>
+							} @else if (isInitialWorldScreen()) {
+								<div class="py-4">
+									@if (textToSpeech.isEnabled()) {
+										<div class="mb-1 flex justify-end gap-1">
+											@if (textToSpeech.isPaused()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+													aria-label="Wznów czytanie"
+													title="Wznów"
+													(click)="textToSpeech.resume()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="m8 5 12 7-12 7V5Z" />
+													</svg>
+												</button>
+											} @else if (textToSpeech.isSpeaking()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+													aria-label="Wstrzymaj czytanie"
+													title="Pauza"
+													(click)="textToSpeech.pause()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="M8 5h3v14H8zM15 5h3v14h-3z" />
+													</svg>
+												</button>
+											}
+											@if (textToSpeech.isSpeaking()) {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+													aria-label="Zatrzymaj czytanie"
+													title="Zatrzymaj"
+													(click)="textToSpeech.stop()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+														<rect x="6" y="6" width="12" height="12" rx="1" />
+													</svg>
+												</button>
+											} @else {
+												<button
+													type="button"
+													class="rounded p-1.5 text-[#c5a86e] transition hover:bg-white/5 hover:text-[#ead9b6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d6b875]"
+													[attr.aria-label]="textToSpeech.isSpeaking() ? 'Przeczytaj wstęp ponownie' : 'Rozpocznij czytanie wstępu'"
+													[attr.title]="textToSpeech.isSpeaking() ? 'Przeczytaj ponownie' : 'Rozpocznij czytanie'"
+													(click)="startCurrentNarration()">
+													<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+														<path d="m8 5 12 7-12 7V5Z" />
+													</svg>
+												</button>
+											}
+										</div>
+									}
+									<div class="mb-3 text-center text-4xl text-[#c5a86e]">✥</div>
+									<div class="ornament mb-1 text-center text-[11px]">✦ &nbsp; IMPERIUM CONDITUM &nbsp; ✦</div>
+									<h3 class="text-center text-2xl font-semibold text-[#e5d4b2]">Początek nowego panowania</h3>
+									@if (currentRuler(); as ruler) {
+										<div class="mx-auto mt-6">
+											<div class="mx-auto flex max-w-xl items-center gap-4 rounded border border-[#a58a58]/40 bg-black/20 p-4 text-left">
+												<imp-character-portrait [character]="ruler" [empireColor]="getCharacterEmpire(ruler)?.color ?? null" size="large" />
+												<span class="min-w-0 flex-1">
+													<span class="block text-sm uppercase tracking-wider text-[#9c8966]">Władca założyciel</span>
+													<span class="mt-1 line-clamp-2 block break-words text-xl font-semibold text-[#e1d2b3]">{{ ruler.fullName }}</span>
+													<span class="mt-1 block text-base text-[#aa9b80]">{{ ruler.occupation }} · {{ factionLabels[ruler.faction] }}</span>
+													@if (getCharacterEmpire(ruler); as empire) {
+														<span class="mt-1 block truncate text-sm" [style.color]="empire.color">{{ empire.name }}</span>
+													}
+												</span>
+											</div>
+											@if (ruler.biography.length > 0) {
+												<div class="mt-3 rounded border border-[#a58a58]/25 bg-black/15 p-4">
+													<h4 class="mb-2 text-base font-semibold text-[#ddcba7]">Początek kroniki</h4>
+													@for (entry of ruler.biography; track $index) {
+														<p class="text-base leading-6 text-[#b7aa91]">{{ entry }}</p>
+													}
+												</div>
+											}
+										</div>
+									}
+									<div class="mx-auto mt-6 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+										@for (key of getStatisticKeys(); track key) {
+											<div class="rounded border border-[#a58a58]/30 bg-black/15 px-3 py-3">
+												<p class="text-sm text-[#aa9b80]">{{ statisticLabels[key] }}</p>
+												<p class="mt-1 text-lg font-semibold tabular-nums text-[#e2d3b4]">{{ getStatisticDisplay(game.state()!, key) }}</p>
+											</div>
+										}
+									</div>
+									<div class="mt-7 text-center">
+										@if (game.isPrefetchingNextEvent()) {
+											<p class="mb-3 text-sm text-[#aa9b82]" role="status">Kronikarze przygotowują pierwszą audiencję…</p>
+										}
+										<button class="medieval-button rounded px-7 py-3 text-base font-semibold" (click)="continueStory()">Rozpocznij pierwszą audiencję</button>
+									</div>
+								</div>
+							} @else {
+								<div class="flex min-h-[400px] flex-col items-center justify-center text-center">
+									<div class="mb-4 text-5xl text-[#c5a86e]">✉</div>
+									<h3 class="text-xl text-[#e5d4b2]">Dwór oczekuje na wieści</h3>
+									<p class="mt-2 max-w-sm text-base leading-6 text-[#a99b82]">
+										Kronikarz rozpocznie nowy zapis wydarzeń na podstawie aktualnej sytuacji imperium.
+									</p>
+									<button class="medieval-button mt-6 rounded px-6 py-3 text-base" (click)="continueStory()">Rozpocznij audiencję</button>
+								</div>
+							}
+						</section>
+					}
+
+					@if (selectedTab() === "chronicle") {
+						<section class="panel-dark min-h-[600px] rounded-lg p-4 sm:p-6">
+							<div class="mb-5 border-b gold-rule pb-4 text-center">
+								<div class="ornament mb-1 text-[11px]">✦ &nbsp; ANNales REGNI &nbsp; ✦</div>
+								<h2 class="text-xl font-semibold text-[#ead9b6]">Kronika imperium</h2>
+								<p class="mt-1 text-base text-[#988b75]">Nieprzerwana historia decyzji i ich następstw.</p>
+							</div>
+							@if (game.state()!.chronicle.length === 0) {
+								<div class="py-24 text-center text-base text-[#9d907a]">
+									Karty kroniki są jeszcze puste. Pierwsze wydarzenie zostanie zapisane po podjęciu decyzji.
+								</div>
+							} @else {
+								<div class="relative ml-2 space-y-5 border-l border-[#957b4b]/55 pl-6">
+									@for (entry of game.state()!.chronicle.slice().reverse(); track entry.id) {
+										<article class="relative rounded border border-white/5 bg-black/20 p-4">
+											<span class="absolute -left-[31px] top-5 h-2.5 w-2.5 rounded-full border border-[#d0b477] bg-[#6e5735]"></span>
+											<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+												<time class="text-sm text-[#b39a69]">{{ formatDate(entry.date) }}</time>
+												<span class="rounded border border-[#9d8252]/30 px-2 py-1 text-[11px] uppercase tracking-widest text-[#a99163]">{{
+													entry.kind === "decision" ? "Decyzja władcy" : entry.kind === "succession" ? "Zmiana władzy" : "Skutek odroczony"
+												}}</span>
+											</div>
+											<h3 class="text-base font-semibold text-[#e3d3b2]">{{ entry.title }}</h3>
+											<p class="mt-2 text-base leading-6 text-[#b7aa91]">{{ entry.situation }}</p>
+											<div class="mt-3 border-t border-white/5 pt-3">
+												<p class="text-sm text-[#b9a47b]">Reakcja: {{ entry.chosenResponse }}</p>
+												<p class="mt-1 text-base leading-6 text-[#a89b84]">{{ entry.consequenceDescription }}</p>
+											</div>
+											@if (getChangedStatisticKeys(entry.statisticChanges).length > 0 || (entry.neighboringEmpireChanges?.length ?? 0) > 0) {
+												<div class="mt-3 flex flex-wrap gap-2">
+													@for (change of getChangedStatisticKeys(entry.statisticChanges); track change) {
+														<span class="rounded bg-black/25 px-2 py-1 text-[12px] text-[#c0ad84]"
+															>{{ statisticLabels[change] }} {{ entry.statisticChanges[change]! > 0 ? "+" : "" }}{{ entry.statisticChanges[change] }}</span
+														>
+													}
+													@for (change of entry.neighboringEmpireChanges ?? []; track $index) {
+														<span class="rounded bg-black/25 px-2 py-1 text-[12px] text-[#c0ad84]">
+															{{ getNeighboringEmpireChangeLabel(change) }}
+														</span>
+													}
+												</div>
+											}
+											@if (entry.involvedCharacterIds.length > 0) {
+												<div class="mt-3 flex flex-wrap gap-2">
+													@for (characterId of entry.involvedCharacterIds; track characterId) {
+														@if (game.getCharacter(characterId); as character) {
+															<button class="text-sm text-[#c0a773] underline decoration-[#856b40]/50 underline-offset-2" (click)="showCharacter(character)">
+																{{ character.fullName }}
+															</button>
+														}
+													}
+												</div>
+											}
+										</article>
+									}
+								</div>
+							}
+						</section>
+					}
+
+					@if (selectedTab() === "characters") {
+						<section class="panel-dark min-h-[600px] rounded-lg p-4 sm:p-6">
+							<div class="mb-5 border-b gold-rule pb-4 text-center">
+								<div class="ornament mb-1 text-[11px]">✦ &nbsp; PERSONAE REGNI &nbsp; ✦</div>
+								<h2 class="text-xl font-semibold text-[#ead9b6]">Historia postaci</h2>
+								<p class="mt-1 text-base text-[#988b75]">Wszyscy, którzy zapisali się w dziejach imperium.</p>
+							</div>
+							<div class="grid gap-3 sm:grid-cols-2">
+								@for (character of allCharacters(); track character.id) {
+									<button
+										class="flex items-center gap-3 rounded border border-[#a58a58]/25 bg-black/20 p-3 text-left transition hover:border-[#c4a66d]/65 hover:bg-[#85683c]/10"
+										(click)="showCharacter(character)">
+										<imp-character-portrait [character]="character" [empireColor]="getCharacterEmpire(character)?.color ?? null" size="medium" />
+										<span class="min-w-0 flex-1">
+											<span class="line-clamp-2 block break-words text-base font-semibold text-[#e1d2b3]">{{ character.fullName }}</span>
+											<span class="mt-1 block text-sm text-[#aa9b80]">{{ factionLabels[character.faction] }} · {{ character.occupation }}</span>
+											@if (getCharacterEmpire(character); as empire) {
+												<span class="mt-1 block truncate text-[12px]" [style.color]="empire.color">{{ empire.name }}</span>
+											}
+											<span
+												class="mt-1 block text-[12px] uppercase tracking-wider"
+												[class.text-emerald-300]="character.status === 'alive'"
+												[class.text-stone-500]="character.status === 'dead'"
+												>{{ character.status === "alive" ? "Żyje" : "Postać historyczna" }}</span
+											>
+										</span>
+										<span class="text-[#927849]">›</span>
+									</button>
+								}
+							</div>
+						</section>
+					}
+
+					@if (selectedTab() === "dynasty") {
+						<section class="panel-dark min-h-[600px] rounded-lg p-4 sm:p-6">
+							<div class="mb-5 border-b gold-rule pb-4 text-center">
+								<div class="ornament mb-1 text-[11px]">✦ &nbsp; DOMUS REGNANS &nbsp; ✦</div>
+								<h2 class="text-xl font-semibold text-[#ead9b6]">Historia rodu władców</h2>
+								<p class="mt-1 text-base text-[#988b75]">Wszyscy władcy i okresy ich panowania.</p>
+							</div>
+							<div class="space-y-4">
+								@for (reign of game.state()!.reignHistory.slice().reverse(); track reign.id; let index = $index) {
+									@if (getReignRuler(reign); as ruler) {
+										<article class="relative flex gap-4 rounded border border-[#b29765]/25 bg-black/20 p-4">
+											<imp-character-portrait [character]="ruler" [empireColor]="getCharacterEmpire(ruler)?.color ?? null" size="large" />
+											<div class="min-w-0 flex-1">
+												<div class="flex flex-wrap items-center gap-2">
+													<h3 class="font-semibold text-[#e7d7b7]">{{ ruler.fullName }}</h3>
+													@if (hasOpenReign(game.state()!, reign)) {
+														<span
+															class="rounded border border-emerald-700/40 bg-emerald-950/40 px-2 py-0.5 text-[11px] uppercase tracking-wider text-emerald-300"
+															>Panuje obecnie</span
+														>
+													}
+												</div>
+												<p class="mt-1 text-sm text-[#b6a17a]">
+													{{ formatDate(reign.startDate) }} — {{ reign.endDate ? formatDate(reign.endDate) : "do dziś" }}
+												</p>
+												@if (getCharacterEmpire(ruler); as empire) {
+													<p class="mt-1 text-sm" [style.color]="empire.color">{{ empire.name }}</p>
+												}
+												<button class="mt-2 text-sm text-[#c6aa73] underline underline-offset-2" (click)="showCharacter(ruler)">Otwórz biografię</button>
+											</div>
+										</article>
+									}
+								}
+							</div>
+						</section>
+					}
+
+					<nav class="mt-4 grid grid-cols-4 gap-2">
+						<button
+							class="tab-button rounded border px-2 py-3 text-center transition"
+							[class.tab-button-active]="selectedTab() === 'audience'"
+							(click)="selectTab('audience')">
+							<span class="block text-lg text-[#d4b77a]">⚖</span><span class="mt-1 block text-[12px] uppercase tracking-wider text-[#d7c7a8]">Audiencja</span>
+						</button>
+						<button
+							class="tab-button rounded border px-2 py-3 text-center transition"
+							[class.tab-button-active]="selectedTab() === 'chronicle'"
+							(click)="selectTab('chronicle')">
+							<span class="block text-lg text-[#d4b77a]">▤</span><span class="mt-1 block text-[12px] uppercase tracking-wider text-[#d7c7a8]">Kronika</span>
+						</button>
+						<button
+							class="tab-button rounded border px-2 py-3 text-center transition"
+							[class.tab-button-active]="selectedTab() === 'characters'"
+							(click)="selectTab('characters')">
+							<span class="block text-lg text-[#d4b77a]">♟</span><span class="mt-1 block text-[12px] uppercase tracking-wider text-[#d7c7a8]">Postacie</span>
+						</button>
+						<button
+							class="tab-button rounded border px-2 py-3 text-center transition"
+							[class.tab-button-active]="selectedTab() === 'dynasty'"
+							(click)="selectTab('dynasty')">
+							<span class="block text-lg text-[#d4b77a]">♛</span><span class="mt-1 block text-[12px] uppercase tracking-wider text-[#d7c7a8]">Ród władców</span>
+						</button>
+					</nav>
+				</main>
+
+				<aside class="panel-dark h-fit rounded-lg p-4">
+					@if (currentRuler(); as ruler) {
+						<h2 class="mb-2 text-sm font-semibold uppercase tracking-wider text-[#bba577]">Panujący władca</h2>
+						<button
+							type="button"
+							class="mb-5 flex w-full items-center gap-3 rounded border border-transparent p-2 text-left transition hover:border-[#a78c5d]/35 hover:bg-white/[.035] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d6b875]"
+							[attr.aria-label]="'Pokaż szczegóły władcy ' + ruler.fullName"
+							(click)="showCharacter(ruler)">
+							<imp-character-portrait [character]="ruler" [empireColor]="getCharacterEmpire(ruler)?.color ?? null" size="medium" />
+							<span class="min-w-0">
+								<span class="line-clamp-2 block break-words text-base font-semibold text-[#e1d2b3]">{{ ruler.fullName }}</span>
+								@if (getCharacterEmpire(ruler); as empire) {
+									<span class="block truncate text-[12px]" [style.color]="empire.color">{{ empire.name }}</span>
+								}
+							</span>
+						</button>
+					}
+					<div class="mb-4 flex items-center justify-between border-b gold-rule pb-3">
+						<div>
+							<h2 class="text-base font-semibold text-[#e5d5b5]">Orszak władcy</h2>
+							<p class="mt-1 text-[12px] uppercase tracking-widest text-[#927d55]">Żyjące postacie</p>
+						</div>
+						<span class="text-xl text-[#c4a56b]">♜</span>
+					</div>
+					<div class="space-y-2">
+						@for (character of game.state()!.livingCharacters; track character.id) {
+							@if (character.id !== game.state()!.currentRulerId) {
+								<button
+									class="flex w-full items-center gap-3 rounded border border-transparent p-2 text-left transition hover:border-[#a78c5d]/35 hover:bg-white/[.035]"
+									(click)="showCharacter(character)">
+									<imp-character-portrait [character]="character" [empireColor]="getCharacterEmpire(character)?.color ?? null" size="small" />
+									<span class="min-w-0 flex-1">
+										<span class="line-clamp-2 block break-words text-sm font-semibold text-[#d9c9a9]">{{ character.fullName }}</span>
+										<span class="mt-0.5 block truncate text-[12px] text-[#988c76]">{{ factionLabels[character.faction] }}</span>
+										@if (getCharacterEmpire(character); as empire) {
+											<span class="mt-0.5 block truncate text-[11px]" [style.color]="empire.color">{{ empire.name }}</span>
+										}
+									</span>
+								</button>
+							}
+						}
+					</div>
+					<div class="mt-5 border-t gold-rule pt-4">
+						<h3 class="mb-2 text-sm font-semibold uppercase tracking-wider text-[#bba577]">Nierozwiązane wątki</h3>
+						@if (game.state()!.unresolvedThreads.length === 0) {
+							<p class="text-sm text-[#8e826e]">Brak otwartych wątków.</p>
+						} @else {
+							<ul class="space-y-2">
+								@for (thread of game.state()!.unresolvedThreads.slice(0, gameConfig.content.maxUnresolvedThreadsShown); track thread) {
+									<li class="flex gap-2 text-sm leading-5 text-[#a99c84]">
+										<span class="text-[#a88950]">·</span><span>{{ thread }}</span>
+									</li>
+								}
+							</ul>
+						}
+					</div>
+				</aside>
+			</div>
+		</div>
+	}
+
+	@if (selectedCharacter(); as character) {
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" (click)="closeCharacter()">
+			<section class="parchment max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg p-5 sm:p-7" (click)="$event.stopPropagation()">
+				<div class="mb-5 flex items-start justify-between border-b border-[#8c7045]/40 pb-4">
+					<div class="flex items-center gap-4">
+						<imp-character-portrait [character]="character" [empireColor]="getCharacterEmpire(character)?.color ?? null" size="large" />
+						<div>
+							<div class="text-sm uppercase tracking-widest text-[#80643a]">{{ factionLabels[character.faction] }}</div>
+							<h2 class="mt-1 text-2xl font-semibold">{{ character.fullName }}</h2>
+							<p class="mt-1 text-base text-[#725a37]">{{ character.occupation }}</p>
+							@if (getCharacterEmpire(character); as empire) {
+								<p class="mt-1 text-sm font-semibold" [style.color]="empire.color">{{ empire.name }}</p>
+							}
+						</div>
+					</div>
+					<button class="rounded border border-[#8c7045]/50 px-3 py-1 text-base" (click)="closeCharacter()" aria-label="Zamknij">×</button>
+				</div>
+				<div class="mb-5 grid grid-cols-2 gap-3 text-base">
+					<div class="rounded border border-[#8c7045]/30 bg-white/20 p-3">
+						<span class="block text-sm text-[#80643a]">Data urodzenia</span><strong>{{ formatDate(character.birthDate) }}</strong>
+					</div>
+					<div class="rounded border border-[#8c7045]/30 bg-white/20 p-3">
+						<span class="block text-sm text-[#80643a]">Status</span><strong>{{ character.status === "alive" ? "Żyje" : "Zmarła / zmarły" }}</strong>
+					</div>
+				</div>
+				<section class="mb-5">
+					<h3 class="mb-2 border-b border-[#8c7045]/30 pb-2 text-base font-bold uppercase tracking-wider text-[#73552d]">Biografia</h3>
+					<div class="space-y-2 text-base leading-6">
+						@for (biographyEntry of character.biography; track $index) {
+							<p>{{ biographyEntry }}</p>
+						}
+					</div>
+					@if (character.status === "dead") {
+						<div class="mt-4 rounded border border-red-900/20 bg-red-950/5 p-3 text-base">
+							<p><strong>Data śmierci:</strong> {{ character.deathDate ? formatDate(character.deathDate) : "Nieznana" }}</p>
+							<p class="mt-1"><strong>Przyczyna:</strong> {{ character.deathCause ?? "Nieustalona" }}</p>
+						</div>
+					}
+				</section>
+				<section>
+					<h3 class="mb-2 border-b border-[#8c7045]/30 pb-2 text-base font-bold uppercase tracking-wider text-[#73552d]">Relacje</h3>
+					@if (character.relations.length === 0) {
+						<p class="text-base text-[#806d4e]">Nie zapisano jeszcze istotnych relacji tej postaci.</p>
+					} @else {
+						<div class="space-y-2">
+							@for (relation of character.relations; track relation.targetCharacterId) {
+								<div class="rounded border border-[#8c7045]/25 bg-white/15 p-3">
+									<p class="text-base font-bold">{{ getRelationName(relation.targetCharacterId) }} · {{ relation.relation }}</p>
+									<p class="mt-1 text-base leading-5 text-[#705938]">{{ relation.description }}</p>
+								</div>
+							}
+						</div>
+					}
+				</section>
+				<section class="mt-5 border-t border-[#8c7045]/30 pt-4">
+					<div class="flex items-center justify-between gap-4">
+						<div>
+							<h3 class="text-base font-bold uppercase tracking-wider text-[#73552d]">Tajne cechy i skłonności</h3>
+							<p class="mt-1 text-sm leading-5 text-[#8a7049]">Te informacje powinny pozostać niejawne. Odsłoń je świadomie, klikając ikonę oka.</p>
+						</div>
+						<button
+							type="button"
+							class="flex shrink-0 items-center gap-2 rounded border border-[#8c7045]/45 px-3 py-2 text-sm text-[#73552d] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c7045]"
+							[attr.aria-expanded]="isHiddenCharacterDetailsVisible()"
+							aria-controls="hidden-character-details"
+							[attr.aria-label]="isHiddenCharacterDetailsVisible() ? 'Ukryj tajne cechy postaci' : 'Podejrzyj tajne cechy postaci'"
+							(click)="toggleHiddenCharacterDetails()">
+							<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+								@if (isHiddenCharacterDetailsVisible()) {
+									<path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+									<path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5.5 0 9 7 9 7a15.7 15.7 0 0 1-3.1 3.8M6.2 6.2C3.9 7.8 3 12 3 12s3.5 7 9 7c1.1 0 2.1-.3 3-.7" />
+								} @else {
+									<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+									<circle cx="12" cy="12" r="2.5" />
+								}
+							</svg>
+							<span>{{ isHiddenCharacterDetailsVisible() ? "Ukryj" : "Podejrzyj" }}</span>
+						</button>
+					</div>
+					@if (isHiddenCharacterDetailsVisible()) {
+						<div id="hidden-character-details" class="mt-4 grid gap-3 sm:grid-cols-2">
+							@for (trait of hiddenTraitLabels; track trait.key) {
+								<div class="rounded border border-[#8c7045]/25 bg-white/15 p-3">
+									<div class="mb-2 flex justify-between gap-3 text-sm">
+										<span class="font-semibold">{{ trait.label }}</span>
+										<span class="tabular-nums">{{ character.hiddenTraits[trait.key] }} / 100</span>
+									</div>
+									<div
+										class="h-2 overflow-hidden rounded bg-[#8c7045]/15"
+										role="progressbar"
+										[attr.aria-label]="trait.label"
+										[attr.aria-valuenow]="character.hiddenTraits[trait.key]"
+										aria-valuemin="0"
+										aria-valuemax="100">
+										<div class="h-full rounded bg-[#8c7045]" [style.width.%]="character.hiddenTraits[trait.key]"></div>
+									</div>
+								</div>
+							}
+							<p class="text-sm leading-5 text-[#806d4e] sm:col-span-2">
+								Te cechy mogą podpowiadać prawdziwe intencje postaci, ale nie odsłaniają całego jej planu.
+							</p>
+						</div>
+					}
+				</section>
+			</section>
+		</div>
+	}
+
+	@if (showSettings()) {
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm" (click)="showSettings.set(false)">
+			<section class="panel-dark max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-lg p-5 sm:p-7" (click)="$event.stopPropagation()">
+				<div class="mb-5 flex items-start justify-between border-b gold-rule pb-4">
+					<div>
+						<div class="ornament mb-1 text-[11px]">✦ &nbsp; CONSILIUM ARTIFICIALE &nbsp; ✦</div>
+						<h2 class="text-xl font-semibold text-[#ead9b6]">Konfiguracja AI</h2>
+						<p class="mt-1 text-sm text-[#988b75]">Bezpośrednie połączenie z API dostawcy</p>
+					</div>
+					<button class="subtle-button rounded px-3 py-1" (click)="showSettings.set(false)">×</button>
+				</div>
+				<section class="mb-5 rounded border border-[#a58a58]/30 bg-black/20 p-4">
+					<h3 class="text-base font-semibold text-[#e5d5b5]">Czytanie głosowe</h3>
+					<label class="mt-3 flex items-start gap-3 text-base text-[#c8b998]">
+						<input
+							type="checkbox"
+							class="mt-1 accent-[#b79a64]"
+							[disabled]="!textToSpeech.isSupported"
+							[ngModel]="textToSpeech.isEnabled()"
+							(ngModelChange)="textToSpeech.setEnabled($event)" />
+						<span>
+							<strong class="block font-medium">Włącz automatyczne czytanie audiencji i rozstrzygnięć</strong>
+							<span class="mt-1 block text-sm leading-5 text-[#94866e]"
+								>Wyłączenie zatrzymuje bieżący odczyt. Możesz wznowić czytanie przyciskiem na ekranie audiencji.</span
+							>
+						</span>
+					</label>
+					@if (textToSpeech.isSupported) {
+						<label class="mt-4 block text-sm text-[#d6c5a4]" for="speech-voice">Głos lektora</label>
+						<select
+							id="speech-voice"
+							class="field mt-2"
+							[disabled]="!textToSpeech.isEnabled() || textToSpeech.getPolishVoices().length === 0"
+							[ngModel]="textToSpeech.selectedVoiceURI()"
+							(ngModelChange)="textToSpeech.selectVoice($event)">
+							<option value="">Domyślny głos polski</option>
+							@for (voice of textToSpeech.getPolishVoices(); track voice.voiceURI) {
+								<option [value]="voice.voiceURI">{{ voice.name }} · {{ voice.lang }}</option>
+							}
+						</select>
+						<p class="mt-2 text-sm leading-5 text-[#94866e]">
+							@if (textToSpeech.getPolishVoices().length === 0) {
+								Przeglądarka nie udostępnia obecnie polskich głosów; odczyt użyje domyślnego głosu urządzenia.
+							} @else {
+								Wybrany głos zostanie użyty przy następnym odczycie.
+							}
+						</p>
+					} @else {
+						<p class="mt-3 text-sm text-amber-200/80">Ta przeglądarka nie obsługuje syntezy mowy.</p>
+					}
+				</section>
+				<label class="mb-2 block text-base text-[#d6c5a4]" for="provider">Dostawca</label>
+				<select id="provider" class="field mb-4" [ngModel]="selectedProvider()" (ngModelChange)="onProviderChanged($event)">
+					<option value="openai">OpenAI</option>
+					<option value="anthropic">Anthropic</option>
+					<option value="gemini">Google Gemini</option>
+					<option value="ollama">Ollama (lokalnie)</option>
+				</select>
+				<label class="mb-2 block text-base text-[#d6c5a4]" for="model">Model</label>
+				<input id="model" class="field mb-1" list="model-options" [ngModel]="selectedModel()" (ngModelChange)="selectedModel.set($event)" autocomplete="off" />
+				<datalist id="model-options">
+					@for (model of getModelOptions(selectedProvider()); track model) {
+						<option [value]="model"></option>
+					}
+				</datalist>
+				<p class="mb-4 text-sm leading-5 text-[#93866f]">
+					Lista zawiera przykładowe identyfikatory modeli. Pole można edytować, gdy dostawca udostępni nowszy model.
+				</p>
+				@if (selectedProvider() === "ollama") {
+					<div class="mb-4 rounded border border-[#a58a58]/30 bg-black/20 p-3 text-base leading-5 text-[#c8b998]">
+						Ollama działa lokalnie pod adresem <code>http://localhost:11434</code>. Nie potrzebujesz klucza API. Upewnij się, że serwer Ollama jest uruchomiony,
+						a przeglądarka ma zezwolenie CORS dla adresu aplikacji.
+					</div>
+				} @else {
+					<label class="mb-2 block text-base text-[#d6c5a4]" for="api-key">Klucz API</label>
+					<input
+						id="api-key"
+						type="password"
+						class="field mb-3"
+						[ngModel]="apiKey()"
+						(ngModelChange)="apiKey.set($event)"
+						autocomplete="off"
+						spellcheck="false"
+						placeholder="Wklej klucz API" />
+					<label class="mb-4 flex items-start gap-3 rounded border border-[#a58a58]/30 bg-black/20 p-3 text-base text-[#c8b998]">
+						<input type="checkbox" class="mt-1 accent-[#b79a64]" [ngModel]="persistApiKey()" (ngModelChange)="persistApiKey.set($event)" />
+						<span
+							><strong class="block font-medium">Zapisz klucz API w tej przeglądarce</strong
+							><span class="mt-1 block text-sm leading-5 text-[#94866e]"
+								>Domyślnie klucz istnieje tylko w pamięci bieżącej sesji. Zaznaczenie zapisze go w localStorage. Każdy skrypt działający w tej samej domenie
+								może mieć do niego dostęp.</span
+							></span
+						>
+					</label>
+				}
+				<div class="mb-4 rounded border border-amber-700/30 bg-amber-950/15 p-3 text-sm leading-5 text-amber-100/80">
+					Aplikacja działa wyłącznie po stronie przeglądarki i wysyła zapytania bezpośrednio do wybranego dostawcy AI. Dla dostawców chmurowych klucz API nie
+					jest przechowywany bezpiecznie jak na backendzie.
+				</div>
+				@if (configurationError()) {
+					<p class="mb-3 rounded border border-red-900/50 bg-red-950/30 p-3 text-base text-red-200">{{ configurationError() }}</p>
+				}
+				@if (configurationMessage()) {
+					<p class="mb-3 rounded border border-emerald-800/40 bg-emerald-950/30 p-3 text-base text-emerald-200">{{ configurationMessage() }}</p>
+				}
+				<div class="flex flex-wrap gap-2">
+					<button class="subtle-button flex-1 rounded px-4 py-2.5 text-base" [disabled]="isTestingConnection()" (click)="testConnection()">
+						{{ isTestingConnection() ? "Testowanie…" : "Testuj połączenie" }}
+					</button>
+					<button class="medieval-button flex-1 rounded px-4 py-2.5 text-base" (click)="saveConfiguration()">Zapisz konfigurację</button>
+				</div>
+			</section>
+		</div>
+	}
+
+	@if (showSaveManager()) {
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm" (click)="showSaveManager.set(false)">
+			<section class="panel-dark max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg p-5" (click)="$event.stopPropagation()">
+				<div class="mb-4 flex items-center justify-between border-b gold-rule pb-3">
+					<button class="subtle-button rounded px-3 py-1" (click)="showSaveManager.set(false)">×</button>
+				</div>
+				@if (game.saves().length === 0) {
+					<p class="py-8 text-center text-base text-[#9d907a]">Nie ma zapisanych gier.</p>
+				} @else {
+					<div class="space-y-2">
+						@for (save of game.saves(); track save.id) {
+							<div class="flex items-center justify-between gap-3 rounded border border-white/5 bg-black/20 p-3">
+								<div class="min-w-0">
+									<p class="truncate text-base text-[#e2d4b8]">{{ save.kingdomName }}</p>
+									<p class="mt-1 text-sm text-[#94856b]">{{ save.currentRulerName }} · {{ formatShortDate(save.currentDate) }}</p>
+								</div>
+								<div class="flex shrink-0 gap-2">
+									<button class="subtle-button rounded px-3 py-2 text-sm" (click)="loadGame(save.id)">Wczytaj</button
+									><button class="rounded border border-red-900/50 px-2 text-sm text-red-300" (click)="deleteGame(save.id)">Usuń</button>
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</section>
+		</div>
+	}
+</div>
