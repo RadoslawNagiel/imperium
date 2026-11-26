@@ -273,6 +273,9 @@
 											<imp-character-portrait [character]="speaker" [empireColor]="getCharacterEmpire(speaker)?.color ?? null" size="medium" />
 											<div class="min-w-0">
 												<p class="text-[12px] uppercase tracking-widest text-[#9c8966]">Osoba przybyła na audiencję</p>
+												@if (event.speakerIsNew) {
+													<p class="mt-1 text-[11px] font-semibold uppercase tracking-wider text-[#d6b875]">Nowa postać</p>
+												}
 												<p class="line-clamp-2 break-words text-base font-semibold text-[#e1d2b3]">{{ speaker.fullName }}</p>
 												<p class="truncate text-sm text-[#aa9b80]">{{ speaker.occupation }} · {{ factionLabels[speaker.faction] }}</p>
 												@if (getCharacterEmpire(speaker); as empire) {
@@ -431,9 +434,6 @@
 										}
 									}
 									<div class="mt-6 text-center">
-										@if (game.isPrefetchingNextEvent()) {
-											<p class="mb-3 text-sm text-[#84683c]" role="status">Kronikarze przygotowują kolejną audiencję…</p>
-										}
 										<button class="medieval-button rounded px-7 py-3 text-base font-semibold" (click)="continueStory()">Przyjmij kolejne wieści</button>
 									</div>
 								</div>
@@ -801,33 +801,18 @@
 						</div>
 					}
 				</section>
-				<section>
-					<h3 class="mb-2 border-b border-[#8c7045]/30 pb-2 text-base font-bold uppercase tracking-wider text-[#73552d]">Relacje</h3>
-					@if (character.relations.length === 0) {
-						<p class="text-base text-[#806d4e]">Nie zapisano jeszcze istotnych relacji tej postaci.</p>
-					} @else {
-						<div class="space-y-2">
-							@for (relation of character.relations; track relation.targetCharacterId) {
-								<div class="rounded border border-[#8c7045]/25 bg-white/15 p-3">
-									<p class="text-base font-bold">{{ getRelationName(relation.targetCharacterId) }} · {{ relation.relation }}</p>
-									<p class="mt-1 text-base leading-5 text-[#705938]">{{ relation.description }}</p>
-								</div>
-							}
-						</div>
-					}
-				</section>
 				<section class="mt-5 border-t border-[#8c7045]/30 pt-4">
 					<div class="flex items-center justify-between gap-4">
 						<div>
-							<h3 class="text-base font-bold uppercase tracking-wider text-[#73552d]">Tajne cechy i skłonności</h3>
-							<p class="mt-1 text-sm leading-5 text-[#8a7049]">Te informacje powinny pozostać niejawne. Odsłoń je świadomie, klikając ikonę oka.</p>
+							<h3 class="text-base font-bold uppercase tracking-wider text-[#73552d]">Ukryte cechy charakteru</h3>
+							<p class="mt-1 text-sm leading-5 text-[#8a7049]">Podejrzyj pięć cech, które kształtują charakter tej postaci.</p>
 						</div>
 						<button
 							type="button"
 							class="flex shrink-0 items-center gap-2 rounded border border-[#8c7045]/45 px-3 py-2 text-sm text-[#73552d] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8c7045]"
 							[attr.aria-expanded]="isHiddenCharacterDetailsVisible()"
 							aria-controls="hidden-character-details"
-							[attr.aria-label]="isHiddenCharacterDetailsVisible() ? 'Ukryj tajne cechy postaci' : 'Podejrzyj tajne cechy postaci'"
+							[attr.aria-label]="isHiddenCharacterDetailsVisible() ? 'Ukryj cechy charakteru postaci' : 'Podejrzyj cechy charakteru postaci'"
 							(click)="toggleHiddenCharacterDetails()">
 							<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
 								@if (isHiddenCharacterDetailsVisible()) {
@@ -843,26 +828,12 @@
 					</div>
 					@if (isHiddenCharacterDetailsVisible()) {
 						<div id="hidden-character-details" class="mt-4 grid gap-3 sm:grid-cols-2">
-							@for (trait of hiddenTraitLabels; track trait.key) {
-								<div class="rounded border border-[#8c7045]/25 bg-white/15 p-3">
-									<div class="mb-2 flex justify-between gap-3 text-sm">
-										<span class="font-semibold">{{ trait.label }}</span>
-										<span class="tabular-nums">{{ character.hiddenTraits[trait.key] }} / 100</span>
-									</div>
-									<div
-										class="h-2 overflow-hidden rounded bg-[#8c7045]/15"
-										role="progressbar"
-										[attr.aria-label]="trait.label"
-										[attr.aria-valuenow]="character.hiddenTraits[trait.key]"
-										aria-valuemin="0"
-										aria-valuemax="100">
-										<div class="h-full rounded bg-[#8c7045]" [style.width.%]="character.hiddenTraits[trait.key]"></div>
-									</div>
+							@for (trait of character.hiddenTraits; track $index) {
+								<div class="rounded border border-[#8c7045]/25 bg-white/15 p-3 text-sm leading-5">
+									{{ trait }}
 								</div>
 							}
-							<p class="text-sm leading-5 text-[#806d4e] sm:col-span-2">
-								Te cechy mogą podpowiadać prawdziwe intencje postaci, ale nie odsłaniają całego jej planu.
-							</p>
+							<p class="text-sm leading-5 text-[#806d4e] sm:col-span-2">Cechy są stałe i nie odsłaniają wszystkich planów postaci.</p>
 						</div>
 					}
 				</section>
@@ -926,6 +897,8 @@
 					<option value="openai">OpenAI</option>
 					<option value="anthropic">Anthropic</option>
 					<option value="gemini">Google Gemini</option>
+					<option value="groq">Groq</option>
+					<option value="openrouter">OpenRouter</option>
 					<option value="ollama">Ollama (lokalnie)</option>
 				</select>
 				<label class="mb-2 block text-base text-[#d6c5a4]" for="model">Model</label>

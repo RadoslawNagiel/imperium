@@ -113,24 +113,16 @@ export class GameFactoryService {
 		empireColor: EmpireColor,
 	): KingdomState {
 		const now = new Date().toISOString();
-		const characterIds = new Map(initialWorld.characters.map((character) => [character.id, crypto.randomUUID()]));
-		const getCharacterId = (sourceId: string): string => {
-			const characterId = characterIds.get(sourceId);
-			if (!characterId) {
-				throw new Error(`Nie odnaleziono początkowej postaci o identyfikatorze ${sourceId}.`);
-			}
-			return characterId;
-		};
-		const livingCharacters: GameCharacter[] = initialWorld.characters.map(({ id, ...character }) => ({
+		const livingCharacters: GameCharacter[] = initialWorld.characters.map(({ empireName, ...character }) => ({
 			...character,
-			id: getCharacterId(id),
+			id: crypto.randomUUID(),
+			empireId,
 			status: "alive",
-			relations: character.relations.map((relation) => ({
-				...relation,
-				targetCharacterId: getCharacterId(relation.targetCharacterId),
-			})),
 		}));
-		const rulerId = getCharacterId(initialWorld.rulerId);
+		const rulerId = livingCharacters[0]?.id;
+		if (!rulerId) {
+			throw new Error("Świat początkowy musi zawierać władcę.");
+		}
 		const firstReign: ReignPeriod = {
 			id: crypto.randomUUID(),
 			rulerCharacterId: rulerId,

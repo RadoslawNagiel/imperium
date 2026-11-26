@@ -206,6 +206,42 @@ class GeminiProvider extends BaseAiProvider {
 	}
 }
 
+class ChatCompletionsProvider extends BaseAiProvider {
+	public constructor(
+		private readonly endpoint: string,
+		private readonly providerName: string,
+	) {
+		super();
+	}
+
+	public async generateJson(systemPrompt: string, userPrompt: string, configuration: AiConfiguration): Promise<string> {
+		const response = await this.postJson(
+			this.endpoint,
+			{
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${configuration.apiKey}`,
+			},
+			{
+				model: configuration.model,
+				messages: [
+					{ role: "system", content: `${systemPrompt}\nZwróć wyłącznie poprawny JSON, bez Markdown i tekstu poza obiektem JSON.` },
+					{ role: "user", content: userPrompt },
+				],
+				max_tokens: GAME_CONFIG.ai.maxOutputTokens,
+				response_format: { type: "json_object" },
+			},
+		);
+		const responseObject = this.readObject(response);
+		const choices = responseObject?.["choices"];
+		const firstChoice = Array.isArray(choices) ? this.readObject(choices[0]) : null;
+		const message = this.readObject(firstChoice?.["message"]);
+		if (typeof message?.["content"] !== "string" || message["content"].length === 0) {
+			throw new AiProviderError(`Odpowiedź ${this.providerName} nie zawiera tekstowej odpowiedzi JSON.`);
+		}
+		return message["content"];
+	}
+}
+
 class OllamaProvider extends BaseAiProvider {
 	public async generateJson(systemPrompt: string, userPrompt: string, configuration: AiConfiguration): Promise<string> {
 		const response = await this.postJson(
@@ -248,6 +284,8 @@ export class AiProviderService {
 		openai: new OpenAiProvider(),
 		anthropic: new AnthropicProvider(),
 		gemini: new GeminiProvider(),
+		groq: new ChatCompletionsProvider("https://api.groq.com/openai/v1/chat/completions", "Groq"),
+		openrouter: new ChatCompletionsProvider("https://openrouter.ai/api/v1/chat/completions", "OpenRouter"),
 		ollama: new OllamaProvider(),
 	};
 

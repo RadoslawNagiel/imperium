@@ -48,13 +48,6 @@ export class AppComponent implements OnInit {
 	public readonly persistApiKey = signal(false);
 	public readonly statisticLabels = STATISTIC_LABELS;
 	public readonly factionLabels = FACTION_LABELS;
-	public readonly hiddenTraitLabels = [
-		{ key: "loyalty", label: "Wierność" },
-		{ key: "ambition", label: "Ambicja" },
-		{ key: "intelligence", label: "Inteligencja" },
-		{ key: "charisma", label: "Charyzma" },
-		{ key: "cruelty", label: "Okrucieństwo" },
-	] as const;
 	public readonly selectedCharacter = computed(() => {
 		const currentState = this.game.state();
 		const selectedId = this.selectedCharacterId();
@@ -445,10 +438,6 @@ export class AppComponent implements OnInit {
 			: relationship < GAME_CONFIG.statistics.relationsNeutral
 				? "text-amber-200"
 				: "text-emerald-300";
-	}
-
-	public getRelationName(relationTargetId: string): string {
-		return this.allCharacters().find((target) => target.id === relationTargetId)?.fullName ?? "Nieznana postać";
 	}
 
 	public getReignRuler(reign: ReignPeriod): GameCharacter | undefined {

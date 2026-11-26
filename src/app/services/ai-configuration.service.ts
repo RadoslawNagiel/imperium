@@ -9,6 +9,8 @@ const DEFAULT_MODELS: Record<AiProviderId, string> = {
 	openai: GAME_CONFIG.providers.defaultModels.openai,
 	anthropic: GAME_CONFIG.providers.defaultModels.anthropic,
 	gemini: GAME_CONFIG.providers.defaultModels.gemini,
+	groq: GAME_CONFIG.providers.defaultModels.groq,
+	openrouter: GAME_CONFIG.providers.defaultModels.openrouter,
 	ollama: GAME_CONFIG.providers.defaultModels.ollama,
 };
 
@@ -25,6 +27,8 @@ export class AiConfigurationService {
 		openai: [...GAME_CONFIG.providers.availableModels.openai],
 		anthropic: [...GAME_CONFIG.providers.availableModels.anthropic],
 		gemini: [...GAME_CONFIG.providers.availableModels.gemini],
+		groq: [...GAME_CONFIG.providers.availableModels.groq],
+		openrouter: [...GAME_CONFIG.providers.availableModels.openrouter],
 		ollama: [...GAME_CONFIG.providers.availableModels.ollama],
 	};
 

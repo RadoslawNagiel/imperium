@@ -1,4 +1,4 @@
-export type AiProviderId = "openai" | "anthropic" | "gemini" | "ollama";
+export type AiProviderId = "openai" | "anthropic" | "gemini" | "groq" | "openrouter" | "ollama";
 export type GameTab = "audience" | "chronicle" | "characters" | "dynasty";
 export type CharacterFaction = "royal-family" | "aristocracy" | "clergy" | "military" | "commoners" | "merchants" | "diplomacy";
 export type CharacterGender = "female" | "male";
@@ -22,20 +22,6 @@ export interface EmpireStatistics {
 export type BoundedStatisticKey = Exclude<keyof EmpireStatistics, "population">;
 export type StatisticChanges = Partial<Record<keyof EmpireStatistics, number>>;
 
-export interface HiddenCharacterTraits {
-	loyalty: number;
-	ambition: number;
-	intelligence: number;
-	charisma: number;
-	cruelty: number;
-}
-
-export interface CharacterRelation {
-	targetCharacterId: string;
-	relation: string;
-	description: string;
-}
-
 export interface GameCharacter {
 	id: string;
 	empireId: string;
@@ -48,8 +34,7 @@ export interface GameCharacter {
 	status: CharacterStatus;
 	deathDate?: string;
 	deathCause?: string;
-	relations: CharacterRelation[];
-	hiddenTraits: HiddenCharacterTraits;
+	hiddenTraits: string[];
 }
 
 export interface PlayerChoice {
@@ -64,6 +49,25 @@ export interface GameEvent {
 	situation: string;
 	speakerCharacterId: string;
 	choices: PlayerChoice[];
+	speakerIsNew?: boolean;
+	threadDirective?: ThreadDirective;
+}
+
+export type ThreadTopic =
+	| {
+			kind: "statistic";
+			statistic: keyof EmpireStatistics;
+			label: string;
+	  }
+	| {
+			kind: "neighboring-empire-relationship";
+			empireName: string;
+	  };
+
+export interface ThreadDirective {
+	topic: ThreadTopic | null;
+	forceNewThread: boolean;
+	forceResolvedThreads: string[];
 }
 
 export interface NeighboringEmpire {
@@ -88,21 +92,55 @@ export interface CharacterCreationData {
 	gender: CharacterGender;
 	occupation: string;
 	biography: string[];
-	relations: CharacterRelation[];
-	hiddenTraits: HiddenCharacterTraits;
+	hiddenTraits: string[];
+}
+
+export type AiCharacterData = Omit<CharacterCreationData, "id" | "empireId"> & { empireName?: string };
+
+export interface AiCharacterReference {
+	fullName: string;
+	birthDate: string;
+	faction: CharacterFaction;
+	gender: CharacterGender | null;
+	occupation: string;
+	empireName: string;
 }
 
 export interface InitialWorldAiResponse {
-	rulerId: string;
-	characters: CharacterCreationData[];
+	characters: AiCharacterData[];
 	neighboringEmpireName: string;
+}
+
+export interface AiCharacterUpdate {
+	character: AiCharacterReference;
+	empireName?: string;
+	biographyAddition?: string;
+	occupation?: string;
+}
+
+export interface AiCharacterDeath {
+	character: AiCharacterReference;
+	cause: string;
+}
+
+export interface AiConsequenceEffect {
+	description: string;
+	statisticChanges: StatisticChanges;
+	neighboringEmpireRelationshipChanges: Array<{ neighboringEmpireName: string; change: number }>;
+	newNeighboringEmpires: Array<{ name: string; relationship: number }>;
+	fallenNeighboringEmpireNames: string[];
+	characterUpdates: AiCharacterUpdate[];
+	deaths: AiCharacterDeath[];
+	newRuler: AiCharacterReference | null;
+	summaryAddition: string;
+	newThreads: string[];
+	resolvedThreads: string[];
 }
 
 export interface CharacterUpdate {
 	characterId: string;
 	empireId?: string;
 	biographyAddition?: string;
-	newRelations?: CharacterRelation[];
 	occupation?: string;
 }
 
@@ -118,7 +156,6 @@ export interface ConsequenceEffect {
 	newNeighboringEmpires: Array<{ id: string; name: string; relationship: number }>;
 	fallenNeighboringEmpireIds: string[];
 	characterUpdates: CharacterUpdate[];
-	newCharacters: CharacterCreationData[];
 	deaths: CharacterDeath[];
 	newRulerId: string | null;
 	summaryAddition: string;
@@ -187,23 +224,34 @@ export interface KingdomState {
 }
 
 export interface NewEventAiResponse {
-	id: string;
 	date: string;
 	title: string;
 	situation: string;
 	speaker:
 		| {
 				kind: "existing";
-				characterId: string;
+				character: AiCharacterReference;
 		  }
 		| {
 				kind: "new";
-				character: CharacterCreationData;
+				character: AiCharacterData;
 		  };
-	choices: PlayerChoice[];
+	choices: Array<Pick<PlayerChoice, "description">>;
 }
 
 export interface DecisionAiResponse {
+	title: string;
+	description: string;
+	immediateEffect: AiConsequenceEffect;
+	delayedConsequences: Array<{
+		dueDate: string;
+		title: string;
+		effect: AiConsequenceEffect;
+	}>;
+	nextEventDate: string;
+}
+
+export interface MaterializedDecisionResponse {
 	id: string;
 	title: string;
 	description: string;

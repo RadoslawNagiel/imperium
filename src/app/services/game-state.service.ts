@@ -9,8 +9,10 @@ import { parseDecisionAiJson, parseInitialWorldAiJson, parseNewEventAiJson } fro
 import { STATISTIC_LABELS } from "../models/game.models";
 import { GAME_CONFIG } from "../config/game.config";
 import type {
+	AiCharacterData,
+	AiCharacterReference,
+	AiConsequenceEffect,
 	CharacterCreationData,
-	CharacterRelation,
 	ConsequenceEffect,
 	DecisionAiResponse,
 	DelayedConsequence,
@@ -18,12 +20,15 @@ import type {
 	GameCharacter,
 	GameEvent,
 	KingdomState,
+	MaterializedDecisionResponse,
 	NeighboringEmpire,
 	NeighboringEmpireChange,
 	NewEventAiResponse,
 	PlayerChoice,
 	SaveSummary,
 	StatisticChanges,
+	ThreadDirective,
+	ThreadTopic,
 } from "../models/game.models";
 
 class AiResponseValidationError extends Error {
@@ -106,13 +111,12 @@ export class GameStateService {
 			initialDate,
 			initialStatistics,
 			initialNeighborRelationship,
-			initialEmpireId,
 			initialRulerGender,
 		);
 		const game = await this.generateValidatedResponse(prompts, (rawResponse) =>
 			this.factory.createNewGame(
 				normalizedKingdomName,
-				parseInitialWorldAiJson(rawResponse, initialDate, initialEmpireId, initialRulerGender),
+				parseInitialWorldAiJson(rawResponse, initialDate, initialRulerGender),
 				initialDate,
 				initialStatistics,
 				initialNeighborRelationship,
@@ -224,12 +228,8 @@ export class GameStateService {
 			this.requireAiConfiguration();
 			const prompts = this.prompts.buildDecisionPrompts(workingState, currentEvent, choiceId);
 			const nextState = await this.generateValidatedResponse(prompts, (rawResponse) => {
-				const response = parseDecisionAiJson(
-					rawResponse,
-					this.factory.createNextEventDate(workingState.currentDate),
-					workingState.neighboringEmpires,
-				);
-				return this.applyDecision(workingState, currentEvent, selectedChoice, response);
+				const response = parseDecisionAiJson(rawResponse, this.factory.createNextEventDate(workingState.currentDate));
+				return this.applyDecision(workingState, currentEvent, selectedChoice, this.materializeDecisionResponse(workingState, response));
 			});
 			await this.commit(nextState);
 			const committedState = this.state();
@@ -279,26 +279,24 @@ export class GameStateService {
 		return changes;
 	}
 
-	private validateAndCreateEvent(state: KingdomState, response: NewEventAiResponse): { event: GameEvent; characters: GameCharacter[] } {
+	private validateAndCreateEvent(
+		state: KingdomState,
+		response: NewEventAiResponse,
+		threadDirective: ThreadDirective,
+		forceNewSpeaker: boolean,
+	): { event: GameEvent; characters: GameCharacter[] } {
 		if (response.date !== state.currentDate) {
 			throw new AiResponseValidationError("AI zwróciło wydarzenie z datą inną niż aktualna data gry.");
-		}
-		const usedEventIds = new Set(state.chronicle.flatMap((entry) => entry.relatedEventIds));
-		for (const consequence of state.pendingConsequences) {
-			usedEventIds.add(consequence.sourceEventId);
-		}
-		if (state.chronicle.some((entry) => entry.id === response.id) || usedEventIds.has(response.id) || state.currentEvent?.id === response.id) {
-			throw new AiResponseValidationError("AI zwróciło identyfikator wydarzenia, który został już użyty.");
-		}
-		const choiceIds = response.choices.map((choice) => choice.id);
-		if (new Set(choiceIds).size !== choiceIds.length) {
-			throw new AiResponseValidationError("Warianty decyzji muszą posiadać unikalne identyfikatory.");
 		}
 		let characters = [...state.livingCharacters];
 		let speakerCharacterId: string;
 		const speakerInformation = response.speaker;
+		if (forceNewSpeaker && speakerInformation.kind !== "new") {
+			throw new AiResponseValidationError("Ta audiencja wymaga wygenerowania nowej postaci.");
+		}
 		if (speakerInformation.kind === "existing") {
-			const speaker = characters.find((character) => character.id === speakerInformation.characterId);
+			const speakerId = this.resolveCharacterReference(state, speakerInformation.character);
+			const speaker = characters.find((character) => character.id === speakerId);
 			if (!speaker || speaker.status !== "alive") {
 				throw new AiResponseValidationError("AI wskazało postać, która nie istnieje lub nie żyje.");
 			}
@@ -310,24 +308,161 @@ export class GameStateService {
 			if (characters.length >= GAME_CONFIG.characters.activeLimit) {
 				throw new AiResponseValidationError(`Osiągnięto limit ${GAME_CONFIG.characters.activeLimit} żyjących postaci. AI nie może utworzyć nowej postaci.`);
 			}
-			const newCharacter = this.createCharacter(speakerInformation.character, characters, state.historicalCharacters, state);
+			const newCharacter = this.createCharacter(this.materializeCharacter(speakerInformation.character, state), characters, state.historicalCharacters, state);
 			characters = [...characters, newCharacter];
 			speakerCharacterId = newCharacter.id;
 		}
 		const event: GameEvent = {
-			id: response.id,
+			id: crypto.randomUUID(),
 			date: response.date,
 			title: response.title,
 			situation: response.situation,
 			speakerCharacterId,
-			choices: response.choices,
+			choices: response.choices.map((choice) => ({ id: crypto.randomUUID(), description: choice.description })),
+			speakerIsNew: speakerInformation.kind === "new",
+			threadDirective,
 		};
 		return { event, characters };
 	}
 
-	private applyDecision(state: KingdomState, event: GameEvent, choice: PlayerChoice, response: DecisionAiResponse): KingdomState {
+	private materializeDecisionResponse(state: KingdomState, response: DecisionAiResponse): MaterializedDecisionResponse {
+		return {
+			id: crypto.randomUUID(),
+			title: response.title,
+			description: response.description,
+			immediateEffect: this.materializeEffect(state, response.immediateEffect),
+			delayedConsequences: response.delayedConsequences.map((consequence) => ({
+				id: crypto.randomUUID(),
+				dueDate: consequence.dueDate,
+				title: consequence.title,
+				effect: this.materializeEffect(state, consequence.effect),
+			})),
+			nextEventDate: response.nextEventDate,
+		};
+	}
+
+	private materializeEffect(state: KingdomState, effect: AiConsequenceEffect): ConsequenceEffect {
+		return {
+			description: effect.description,
+			statisticChanges: effect.statisticChanges,
+			neighboringEmpireRelationshipChanges: effect.neighboringEmpireRelationshipChanges.map((change) => ({
+				neighboringEmpireId: this.resolveNeighboringEmpireId(state, change.neighboringEmpireName),
+				change: change.change,
+			})),
+			newNeighboringEmpires: effect.newNeighboringEmpires.map((empire) => ({ ...empire, id: crypto.randomUUID() })),
+			fallenNeighboringEmpireIds: effect.fallenNeighboringEmpireNames.map((name) => this.resolveNeighboringEmpireId(state, name)),
+			characterUpdates: effect.characterUpdates.map((update) => ({
+				characterId: this.resolveCharacterReference(state, update.character),
+				...(update.empireName ? { empireId: this.resolveEmpireId(state, update.empireName) } : {}),
+				biographyAddition: update.biographyAddition,
+				occupation: update.occupation,
+			})),
+			deaths: effect.deaths.map((death) => ({
+				characterId: this.resolveCharacterReference(state, death.character),
+				cause: death.cause,
+			})),
+			newRulerId: effect.newRuler ? this.resolveCharacterReference(state, effect.newRuler) : null,
+			summaryAddition: effect.summaryAddition,
+			newThreads: effect.newThreads,
+			resolvedThreads: effect.resolvedThreads,
+		};
+	}
+
+	private materializeCharacter(data: AiCharacterData, state: KingdomState): CharacterCreationData {
+		const { empireName, ...characterData } = data;
+		return {
+			...characterData,
+			id: crypto.randomUUID(),
+			empireId: this.resolveEmpireId(state, empireName),
+		};
+	}
+
+	private resolveCharacterReference(state: KingdomState, reference: AiCharacterReference): string {
+		const matches = state.livingCharacters.filter(
+			(character) =>
+				this.matchesContextText(character.fullName, reference.fullName, 60) &&
+				character.birthDate === reference.birthDate &&
+				character.faction === reference.faction &&
+				(character.gender ?? null) === reference.gender &&
+				this.matchesContextText(character.occupation, reference.occupation, 50) &&
+				this.getEmpireName(state, character.empireId).toLocaleLowerCase() === reference.empireName.trim().toLocaleLowerCase(),
+		);
+		if (matches.length !== 1) {
+			throw new AiResponseValidationError(
+				matches.length === 0
+					? `Nie odnaleziono żyjącej postaci pasującej do profilu „${reference.fullName}”.`
+					: `Profil postaci „${reference.fullName}” nie jest jednoznaczny; uzupełnij go danymi dokładnie z kontekstu.`,
+			);
+		}
+		return matches[0].id;
+	}
+
+	private matchesContextText(actual: string, provided: string, maximumLength: number): boolean {
+		const expected = actual.length <= maximumLength ? actual : `${actual.slice(0, maximumLength - 1)}…`;
+		return expected === provided;
+	}
+
+	private toAiCharacterReference(state: KingdomState, character: GameCharacter): AiCharacterReference {
+		return {
+			fullName: this.truncateContextText(character.fullName, 60),
+			birthDate: character.birthDate,
+			faction: character.faction,
+			gender: character.gender ?? null,
+			occupation: this.truncateContextText(character.occupation, 50),
+			empireName: this.getEmpireName(state, character.empireId),
+		};
+	}
+
+	private truncateContextText(value: string, maximumLength: number): string {
+		return value.length <= maximumLength ? value : `${value.slice(0, maximumLength - 1)}…`;
+	}
+
+	private resolveEmpireId(state: KingdomState, empireName?: string): string {
+		if (!empireName || empireName.trim().toLocaleLowerCase() === state.kingdomName.trim().toLocaleLowerCase()) {
+			return state.id;
+		}
+		const matches = state.neighboringEmpires.filter((empire) => empire.name.trim().toLocaleLowerCase() === empireName.trim().toLocaleLowerCase());
+		if (matches.length !== 1) {
+			throw new AiResponseValidationError(`Nie odnaleziono jednoznacznego imperium o nazwie „${empireName}”.`);
+		}
+		return matches[0].id;
+	}
+
+	private resolveNeighboringEmpireId(state: KingdomState, empireName: string): string {
+		const matches = state.neighboringEmpires.filter((empire) => empire.name.trim().toLocaleLowerCase() === empireName.trim().toLocaleLowerCase());
+		if (matches.length !== 1) {
+			throw new AiResponseValidationError(`Nie odnaleziono jednoznacznego sąsiedniego imperium o nazwie „${empireName}”.`);
+		}
+		return matches[0].id;
+	}
+
+	private getEmpireName(state: KingdomState, empireId: string): string {
+		return empireId === state.id ? state.kingdomName : (state.neighboringEmpires.find((empire) => empire.id === empireId)?.name ?? "Nieznane imperium");
+	}
+
+	private applyDecision(state: KingdomState, event: GameEvent, choice: PlayerChoice, response: MaterializedDecisionResponse): KingdomState {
 		if (response.nextEventDate <= state.currentDate) {
 			throw new AiResponseValidationError("Data następnego wydarzenia musi być późniejsza od aktualnej daty.");
+		}
+		const threadDirective = event.threadDirective;
+		if (threadDirective) {
+			const missingForcedResolutions = threadDirective.forceResolvedThreads.filter((thread) => !response.immediateEffect.resolvedThreads.includes(thread));
+			if (missingForcedResolutions.length > 0) {
+				throw new AiResponseValidationError(
+					`Najbliższe rozstrzygnięcie musi rozwiązać wskazane wątki dokładnie w immediateEffect.resolvedThreads: ${JSON.stringify(missingForcedResolutions)}.`,
+				);
+			}
+			if (threadDirective.forceNewThread) {
+				const createdThreads = response.immediateEffect.newThreads.filter(
+					(thread, index, threads) =>
+						!state.unresolvedThreads.includes(thread) &&
+						!threads.slice(0, index).includes(thread) &&
+						!response.immediateEffect.resolvedThreads.includes(thread),
+				);
+				if (createdThreads.length === 0) {
+					throw new AiResponseValidationError("Najbliższe rozstrzygnięcie musi utworzyć co najmniej jeden nowy, unikalny wątek w immediateEffect.newThreads.");
+				}
+			}
 		}
 		const delayedIds = response.delayedConsequences.map((consequence) => consequence.id);
 		if (new Set(delayedIds).size !== delayedIds.length) {
@@ -364,9 +499,6 @@ export class GameStateService {
 			if (trackedCharacterIds.has(death.characterId)) {
 				involvedCharacterIds.add(death.characterId);
 			}
-		}
-		for (const createdCharacter of response.immediateEffect.newCharacters) {
-			involvedCharacterIds.add(createdCharacter.id);
 		}
 		const chronicleEntry = {
 			id: response.id,
@@ -409,7 +541,6 @@ export class GameStateService {
 			const involvedIds = [
 				...consequence.effect.characterUpdates.map((update) => update.characterId),
 				...consequence.effect.deaths.map((death) => death.characterId),
-				...consequence.effect.newCharacters.map((character) => character.id),
 			];
 			if (consequence.effect.newRulerId !== null) {
 				involvedIds.push(consequence.effect.newRulerId);
@@ -462,19 +593,6 @@ export class GameStateService {
 		let historicalCharacters = [...state.historicalCharacters];
 		let statistics = { ...state.statistics };
 		const neighboringEmpires = this.applyNeighboringEmpireEffects(state, effect);
-		const effectEmpireState = { id: state.id, empireColor: state.empireColor, neighboringEmpires };
-		const existingCharacterIds = new Set([...livingCharacters, ...historicalCharacters].map((character) => character.id));
-		for (const newCharacterData of effect.newCharacters) {
-			if (existingCharacterIds.has(newCharacterData.id)) {
-				throw new AiResponseValidationError(`AI próbowało użyć ponownie identyfikatora postaci: ${newCharacterData.id}.`);
-			}
-			if (livingCharacters.length >= GAME_CONFIG.characters.activeLimit) {
-				throw new AiResponseValidationError(`Konsekwencja przekroczyłaby limit ${GAME_CONFIG.characters.activeLimit} żyjących postaci.`);
-			}
-			const newCharacter = this.createCharacter(newCharacterData, livingCharacters, historicalCharacters, effectEmpireState);
-			livingCharacters = [...livingCharacters, newCharacter];
-			existingCharacterIds.add(newCharacter.id);
-		}
 		for (const [key, delta] of Object.entries(effect.statisticChanges) as Array<[keyof EmpireStatistics, number]>) {
 			if (!Number.isFinite(delta)) {
 				throw new AiResponseValidationError("AI zaproponowało nieprawidłową wartość zmiany statystyki.");
@@ -495,12 +613,10 @@ export class GameStateService {
 			if (update.empireId && !activeEmpireIds.has(update.empireId)) {
 				throw new AiResponseValidationError(`AI próbowało przypisać postać do nieistniejącego imperium: ${update.empireId}.`);
 			}
-			this.validateRelations(update.newRelations ?? [], livingCharacters, historicalCharacters);
 			const updatedCharacter: GameCharacter = {
 				...targetCharacter,
 				empireId: update.empireId ?? targetCharacter.empireId,
 				biography: update.biographyAddition ? [...targetCharacter.biography, update.biographyAddition] : targetCharacter.biography,
-				relations: update.newRelations ? this.mergeRelations(targetCharacter.relations, update.newRelations) : targetCharacter.relations,
 				occupation: update.occupation ?? targetCharacter.occupation,
 			};
 			livingCharacters = livingCharacters.map((character) => (character.id === updatedCharacter.id ? updatedCharacter : character));
@@ -549,19 +665,29 @@ export class GameStateService {
 			}
 		}
 		if (!livingCharacters.some((character) => character.id === currentRulerId)) {
-			throw new AiResponseValidationError("Aktualny władca zginął, ale AI nie wskazało prawidłowego następcy.");
+			const availableSuccessors = state.livingCharacters
+				.filter((character) => character.id !== state.currentRulerId && livingCharacters.some((survivor) => survivor.id === character.id))
+				.map((character) => this.toAiCharacterReference(state, character));
+			const successorGuidance =
+				availableSuccessors.length > 0
+					? `Dostępni następcy (dokładne profile): ${JSON.stringify(availableSuccessors)}.`
+					: "Brak innych żyjących postaci; pomiń śmierć aktualnego władcy.";
+			throw new AiResponseValidationError(
+				`Aktualny władca zginął, ale AI nie wskazało prawidłowego następcy w newRuler. Wskaż dokładny profil innej żyjącej postaci, która nie zginęła w tym samym efekcie. ${successorGuidance}`,
+			);
 		}
-		this.validateRelations(
-			livingCharacters.flatMap((character) => character.relations),
-			livingCharacters,
-			historicalCharacters,
-		);
 		const historicalSummary =
 			effect.summaryAddition.length > 0 ? `${state.historicalSummary}\n${effectiveDate}: ${effect.summaryAddition}` : state.historicalSummary;
 		const unresolvedThreads = [
 			...state.unresolvedThreads.filter((thread) => !effect.resolvedThreads.includes(thread)),
 			...effect.newThreads.filter((thread) => !state.unresolvedThreads.includes(thread)),
 		];
+		if (new Set(effect.newThreads).size !== effect.newThreads.length) {
+			throw new AiResponseValidationError("AI zwróciło powtórzony nowy wątek.");
+		}
+		if (unresolvedThreads.length > GAME_CONFIG.content.maxUnresolvedThreads) {
+			throw new AiResponseValidationError(`Liczba nierozwiązanych wątków nie może przekroczyć ${GAME_CONFIG.content.maxUnresolvedThreads}.`);
+		}
 		const successionEntry =
 			currentRulerId !== state.currentRulerId
 				? [
@@ -613,9 +739,7 @@ export class GameStateService {
 				candidate.id === neighboringEmpireId
 					? {
 							...candidate,
-							relationship: Math.round(
-								Math.min(GAME_CONFIG.statistics.max, Math.max(GAME_CONFIG.statistics.min, candidate.relationship + change)),
-							),
+							relationship: Math.round(Math.min(GAME_CONFIG.statistics.max, Math.max(GAME_CONFIG.statistics.min, candidate.relationship + change))),
 						}
 					: candidate,
 			);
@@ -648,21 +772,11 @@ export class GameStateService {
 			usedEmpireIds.add(newEmpire.id);
 			neighboringEmpires = [
 				...neighboringEmpires,
-				this.factory.createNeighboringEmpire(
-					newEmpire.name,
-					newEmpire.relationship,
-					neighboringEmpires,
-					state.id,
-					state.empireColor,
-					newEmpire.id,
-				),
+				this.factory.createNeighboringEmpire(newEmpire.name, newEmpire.relationship, neighboringEmpires, state.id, state.empireColor, newEmpire.id),
 			];
 		}
 
-		if (
-			neighboringEmpires.length < GAME_CONFIG.world.minNeighboringEmpires ||
-			neighboringEmpires.length > GAME_CONFIG.world.maxNeighboringEmpires
-		) {
+		if (neighboringEmpires.length < GAME_CONFIG.world.minNeighboringEmpires || neighboringEmpires.length > GAME_CONFIG.world.maxNeighboringEmpires) {
 			throw new AiResponseValidationError(
 				`Po konsekwencjach musi pozostać od ${GAME_CONFIG.world.minNeighboringEmpires} do ${GAME_CONFIG.world.maxNeighboringEmpires} sąsiednich imperiów.`,
 			);
@@ -671,13 +785,9 @@ export class GameStateService {
 	}
 
 	private startNextEventPrefetch(state: KingdomState): void {
-		const canPrefetch =
-			state.operation === "idle" &&
-			state.currentEvent === null &&
-			(state.lastResolution !== null || state.chronicle.length === 0);
+		const canPrefetch = state.operation === "idle" && state.currentEvent === null && (state.lastResolution !== null || state.chronicle.length === 0);
 		const configuration = this.aiConfiguration.configuration();
-		const hasConfiguration =
-			(configuration.provider === "ollama" || configuration.apiKey.trim().length > 0) && configuration.model.trim().length > 0;
+		const hasConfiguration = (configuration.provider === "ollama" || configuration.apiKey.trim().length > 0) && configuration.model.trim().length > 0;
 		if (!canPrefetch || !hasConfiguration || this.matchesPrefetch(this.cachedAudience, state) || this.matchesPrefetch(this.eventPrefetch, state)) {
 			return;
 		}
@@ -726,11 +836,57 @@ export class GameStateService {
 
 	private async generateAudience(state: KingdomState): Promise<PreparedAudience> {
 		this.requireAiConfiguration();
-		const prompts = this.prompts.buildNewEventPrompts(state);
+		const threadDirective = this.createThreadDirective(state);
+		const forceNewSpeaker =
+			state.livingCharacters.length < GAME_CONFIG.characters.activeLimit && Math.random() < GAME_CONFIG.characters.newCharacterAudienceChance;
+		const prompts = this.prompts.buildNewEventPrompts(state, threadDirective, forceNewSpeaker);
 		return this.generateValidatedResponse(prompts, (rawResponse) => {
-			const aiEvent = parseNewEventAiJson(rawResponse, state.id);
-			return this.validateAndCreateEvent(state, aiEvent);
+			const aiEvent = parseNewEventAiJson(rawResponse);
+			return this.validateAndCreateEvent(state, aiEvent, threadDirective, forceNewSpeaker);
 		});
+	}
+
+	private createThreadDirective(state: KingdomState): ThreadDirective {
+		const forceResolvedThreads = state.unresolvedThreads.filter(() => Math.random() < GAME_CONFIG.content.forcedThreadResolutionChance);
+		const forceNewThread =
+			state.unresolvedThreads.length === 0 ||
+			(state.unresolvedThreads.length < GAME_CONFIG.content.maxUnresolvedThreads && Math.random() < GAME_CONFIG.content.forcedThreadCreationChance);
+		const topic = forceResolvedThreads.length === 0 && !forceNewThread ? this.chooseThreadTopic(state) : null;
+
+		return { topic, forceNewThread, forceResolvedThreads };
+	}
+
+	private chooseThreadTopic(state: KingdomState): ThreadTopic {
+		const candidates: Array<{ topic: ThreadTopic; weight: number }> = (Object.keys(state.statistics) as Array<keyof EmpireStatistics>)
+			.filter((statistic) => statistic !== "population")
+			.map((statistic) => {
+				const value = state.statistics[statistic];
+
+				return {
+					topic: { kind: "statistic", statistic, label: STATISTIC_LABELS[statistic] },
+					weight: Math.abs(value - GAME_CONFIG.statistics.neutralStatistic) + 1,
+				};
+			});
+		for (const empire of state.neighboringEmpires) {
+			candidates.push({
+				topic: { kind: "neighboring-empire-relationship", empireName: empire.name },
+				weight: Math.abs(empire.relationship - GAME_CONFIG.statistics.neutralStatistic) + 1,
+			});
+		}
+
+		const totalWeight = candidates.reduce((total, candidate) => total + candidate.weight, 0);
+		let selection = Math.random() * totalWeight;
+		for (const candidate of candidates) {
+			selection -= candidate.weight;
+			if (selection < 0) {
+				return candidate.topic;
+			}
+		}
+		const fallback = candidates[candidates.length - 1];
+		if (!fallback) {
+			throw new Error("Nie można wylosować tematu wątku bez dostępnych statystyk.");
+		}
+		return fallback.topic;
 	}
 
 	private matchesPrefetch(prefetch: EventPrefetch | CachedAudience | null, state: KingdomState): boolean {
@@ -776,30 +932,11 @@ export class GameStateService {
 		if (![empireState.id, ...empireState.neighboringEmpires.map((empire) => empire.id)].includes(data.empireId)) {
 			throw new AiResponseValidationError(`Postać ${data.fullName} została przypisana do nieistniejącego imperium.`);
 		}
-		this.validateRelations(data.relations, livingCharacters, historicalCharacters);
 		return {
 			...data,
 			biography: [...data.biography],
-			relations: [...data.relations],
 			status: "alive",
 		};
-	}
-
-	private validateRelations(relations: CharacterRelation[], livingCharacters: GameCharacter[], historicalCharacters: GameCharacter[] = []): void {
-		const knownIds = new Set([...livingCharacters, ...historicalCharacters].map((character) => character.id));
-		for (const relation of relations) {
-			if (!knownIds.has(relation.targetCharacterId)) {
-				throw new AiResponseValidationError(`Relacja wskazuje nieistniejącą lub zmarłą postać: ${relation.targetCharacterId}.`);
-			}
-		}
-	}
-
-	private mergeRelations(existingRelations: CharacterRelation[], addedRelations: CharacterRelation[]): CharacterRelation[] {
-		const relationsByTarget = new Map(existingRelations.map((relation) => [relation.targetCharacterId, relation]));
-		for (const relation of addedRelations) {
-			relationsByTarget.set(relation.targetCharacterId, relation);
-		}
-		return [...relationsByTarget.values()];
 	}
 
 	private requireState(): KingdomState {
@@ -839,10 +976,7 @@ export class GameStateService {
 				if (!(error instanceof SyntaxError || error instanceof ZodError || error instanceof AiResponseValidationError)) {
 					throw error;
 				}
-				console.error(
-					`Błąd walidacji odpowiedzi AI (próba ${attempt}/${GAME_CONFIG.ai.requestAttempts}):`,
-					error instanceof ZodError ? error.issues : error,
-				);
+				console.error(`Błąd walidacji odpowiedzi AI (próba ${attempt}/${GAME_CONFIG.ai.requestAttempts}):`, error instanceof ZodError ? error.issues : error);
 				if (attempt === GAME_CONFIG.ai.requestAttempts) {
 					throw error;
 				}
