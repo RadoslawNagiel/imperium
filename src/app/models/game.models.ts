@@ -1,6 +1,6 @@
 export type AiProviderId = "openai" | "anthropic" | "gemini" | "groq" | "openrouter" | "ollama";
 export type GameTab = "audience" | "chronicle" | "characters" | "dynasty";
-export type CharacterFaction = "royal-family" | "aristocracy" | "clergy" | "military" | "commoners" | "merchants" | "diplomacy";
+export type CharacterFaction = "aristocracy" | "clergy" | "chivalry" | "peasantry" | "merchants";
 export type CharacterGender = "female" | "male";
 export type CharacterStatus = "alive" | "dead";
 export type GameOperation = "idle" | "generating-event" | "resolving-decision";
@@ -299,11 +299,9 @@ export const STATISTIC_LABELS: Record<keyof EmpireStatistics, string> = {
 };
 
 export const FACTION_LABELS: Record<CharacterFaction, string> = {
-	"royal-family": "Imperialna rodzina",
 	aristocracy: "Arystokracja",
 	clergy: "Duchowieństwo",
-	military: "Wojsko",
-	commoners: "Mieszkańcy",
+	chivalry: "Rycerstwo",
+	peasantry: "Chłopstwo",
 	merchants: "Kupcy",
-	diplomacy: "Dyplomacja",
 };

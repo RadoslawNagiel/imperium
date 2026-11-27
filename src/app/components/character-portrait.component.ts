@@ -34,7 +34,7 @@ interface PortraitPalette {
 				<path d="M25 21c1-1 2-1 4 0m7 0c2-1 3-1 4 0" fill="none" stroke="#32271d" stroke-width="1" stroke-linecap="round" />
 				@if (hasHeadwear) {
 					<path d="M19 17h26l-3-5H22z" [attr.fill]="palette.accent" stroke="#e2c98c" stroke-width=".8" />
-					@if (character.faction === "royal-family") {
+					@if (character.faction === "aristocracy") {
 						<path d="M22 12l2-6 8 5 8-5 2 6" fill="none" stroke="#e2c98c" stroke-width="2" stroke-linejoin="round" />
 					}
 				}
@@ -77,23 +77,19 @@ export class CharacterPortraitComponent {
 	@Input() public empireColor: string | null = null;
 
 	private readonly palettes: Record<CharacterFaction, PortraitPalette> = {
-		"royal-family": { background: "#493b2c", clothing: "#392b3f", accent: "#c4a66a" },
 		aristocracy: { background: "#50332f", clothing: "#40272d", accent: "#c19c72" },
 		clergy: { background: "#40394b", clothing: "#302b3e", accent: "#d3c59a" },
-		military: { background: "#3e493b", clothing: "#2c392f", accent: "#b8a36e" },
-		commoners: { background: "#4c4434", clothing: "#39362c", accent: "#bd9a65" },
+		chivalry: { background: "#3e493b", clothing: "#2c392f", accent: "#b8a36e" },
+		peasantry: { background: "#4c4434", clothing: "#39362c", accent: "#bd9a65" },
 		merchants: { background: "#4c3b32", clothing: "#39302c", accent: "#d1ae69" },
-		diplomacy: { background: "#39454b", clothing: "#2c373e", accent: "#c8b783" },
 	};
 
 	private readonly factionIcons: Record<CharacterFaction, string> = {
-		"royal-family": "♛",
 		aristocracy: "♜",
 		clergy: "✠",
-		military: "⚔",
-		commoners: "♟",
+		chivalry: "⚔",
+		peasantry: "♟",
 		merchants: "⚖",
-		diplomacy: "✉",
 	};
 
 	private readonly hairStyles: Record<CharacterGender, { back: string; front: string }> = {
@@ -132,11 +128,7 @@ export class CharacterPortraitComponent {
 	}
 
 	public get hasHeadwear(): boolean {
-		return (
-			this.character.faction === "royal-family" ||
-			this.character.faction === "aristocracy" ||
-			(this.character.faction === "military" && this.nameSeed % 2 === 0)
-		);
+		return this.character.faction === "aristocracy" || (this.character.faction === "chivalry" && this.nameSeed % 2 === 0);
 	}
 
 	public get skinTone(): string {

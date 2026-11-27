@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { CharacterFaction, CharacterGender, DecisionAiResponse, InitialWorldAiResponse, NewEventAiResponse } from "./game.models";
 import { GAME_CONFIG } from "../config/game.config";
 
-const factionValues: [CharacterFaction, ...CharacterFaction[]] = ["royal-family", "aristocracy", "clergy", "military", "commoners", "merchants", "diplomacy"];
+const factionValues: [CharacterFaction, ...CharacterFaction[]] = ["aristocracy", "clergy", "chivalry", "peasantry", "merchants"];
 const genderValues: [CharacterGender, ...CharacterGender[]] = ["female", "male"];
 
 const arrayOrEmpty = <T extends z.ZodType>(itemSchema: T, max?: number) => {
@@ -123,8 +123,8 @@ const initialWorldSchema = z
 		neighboringEmpireName: z.string().trim().min(GAME_CONFIG.world.minNeighboringEmpireNameLength).max(GAME_CONFIG.world.maxNeighboringEmpireNameLength),
 	})
 	.superRefine((world, context) => {
-		if (world.characters[0]?.faction !== "royal-family") {
-			context.addIssue({ code: "custom", message: "Początkowa postać musi należeć do frakcji royal-family.", path: ["characters", 0, "faction"] });
+		if (world.characters[0]?.faction !== "aristocracy") {
+			context.addIssue({ code: "custom", message: "Początkowa postać musi należeć do frakcji aristocracy.", path: ["characters", 0, "faction"] });
 		}
 		for (const [characterIndex, character] of world.characters.entries()) {
 			if (character.biography.length > GAME_CONFIG.characters.maxInitialBiographyEntries) {

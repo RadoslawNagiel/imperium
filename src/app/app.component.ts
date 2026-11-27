@@ -20,7 +20,7 @@ import { AiConfigurationService } from "./services/ai-configuration.service";
 import { AiProviderService } from "./services/ai-provider.service";
 import { GameCalendarService } from "./services/game-calendar.service";
 import { GameStateService } from "./services/game-state.service";
-import { TextToSpeechService } from "./services/text-tos-peech.service";
+import { TextToSpeechService } from "./services/text-to-speech.service";
 
 @Component({
 	selector: "imp-root",
